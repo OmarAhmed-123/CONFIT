@@ -1,0 +1,151 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# PentAGI standalone — copy .env.example to pentagi.env locally (never commit secrets)
+pentagi-standalone/pentagi.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Backend
+backend/.env
+backend/.env.postgres
+backend/.env.production
+backend/__pycache__
+backend/**/__pycache__
+backend/venv
+backend/.venv
+backend/db/
+backend/*.db
+backend/confit.db
+backend/.pytest_cache
+backend/.server_lock_*
+backend/alembic/versions/*.py
+!backend/alembic/versions/__init__.py
+!backend/alembic/versions/0006_egypt_payment_stack.py
+!backend/alembic/versions/0007_multi_actor_notifications.py
+!backend/alembic/versions/0008_ai_features_tables.py
+backend/migrations/versions/*.py
+!backend/migrations/versions/__init__.py
+
+# Additional Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# AI/ML
+*.pkl
+*.joblib
+models/
+checkpoints/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Generated secrets - NEVER COMMIT
+.generated_secrets/
+backend/.generated_secrets/
+**/.generated_secrets/
+
+# Root .env (production secrets)
+/.env
+
+# Docker
+.dockerignore
+
+# Frontend build output
+frontend/.next
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Database files (root level)
+*.db
+
+# Backend config env files (dev secrets)
+backend/configs/*.env
+!backend/configs/*.env.example
+
+# IDE and editor caches
+.cursor/
+.windsurf/
+.vs/
+
+# Temp / cache
+.tmp/
+.npm-cache/
+
+# Junk directory
+-Force/
+
+# AI Security secrets
+ai-security/pentagi/.env
+
+# Backend temporary/debug files
+backend/tmp_*.png
+backend/tmp_*.jpg
+backend/tp_out_*.jpg
+backend/tryon_debug_*.jpg
+backend/*_result.txt
+backend/test_output*.txt
+backend/get_pip.py
+
+# Backend batch helper scripts (dev-only)
+backend/fix_pip*.bat
+backend/install_*.bat
+backend/run_*.bat
+
+# Push output
+push_output.txt
+
+# Next.js build info
+frontend/tsconfig.tsbuildinfo
+
+# Gemini / AI agent
+.gemini/

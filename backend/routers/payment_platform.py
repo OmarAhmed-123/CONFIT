@@ -1,0 +1,415 @@
+"""
+Unified payment API (FastAPI source of truth): Stripe + Paymob + PayPal.
+Legacy routes /api/payments/intent and /confirm remain unchanged.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from database.session import SessionLocal
+from database.models import Order as OrderModel
+from database.payment_platform_models import Invoice, Payment, PaymentEvent
+from services.auth_service import UserProfile
+from services.payment_platform.event_bus import bus
+from services.payment_platform import orchestrator as orch
+from services.payment_platform.providers import paymob_provider as pm
+from services.payment_platform.providers import paypal_provider as pp
+from services.payment_platform.providers import fawry_provider as fw
+from utils.auth_deps import optional_auth
+from core.slowapi_limiter import limiter, LIMIT_PAYMENT, LIMIT_WEBHOOK
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["Payments — Unified"])
+
+
+async def _log_payment_success(payload: Dict[str, Any]) -> None:
+    logger.info("event payment_success order=%s payment=%s", payload.get("order_id"), payload.get("payment_id"))
+
+
+async def _log_payment_failed(payload: Dict[str, Any]) -> None:
+    logger.warning("event payment_failed order=%s reason=%s", payload.get("order_id"), payload.get("reason"))
+
+
+async def _log_invoice(payload: Dict[str, Any]) -> None:
+    logger.info("event invoice_created invoice=%s order=%s", payload.get("invoice_id"), payload.get("order_id"))
+
+
+bus.subscribe("payment_success", _log_payment_success)
+bus.subscribe("payment_failed", _log_payment_failed)
+bus.subscribe("invoice_created", _log_invoice)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+class UnifiedSessionBody(BaseModel):
+    order_id: str = Field(..., min_length=1)
+    provider: str = Field(..., pattern="^(stripe|paymob|paypal|fawry|valu|cash_on_delivery)$")
+    billing: Optional[Dict[str, str]] = None
+    paypal_return_url: Optional[str] = None
+    paypal_cancel_url: Optional[str] = None
+    # Fawry-specific
+    payment_method: Optional[str] = None  # CARD, CASH_ON_DELIVERY, WALLET, FAWRY_REF_NUMBER
+    # Valu-specific
+    tenor: Optional[int] = None  # 6, 9, 12, 18, 24 months
+
+
+@router.post("/api/payments/unified/session")
+@limiter.limit(LIMIT_PAYMENT)
+async def create_unified_session(
+    request: Request,
+    body: UnifiedSessionBody,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    if not user:
+        raise HTTPException(401, "Authentication required")
+    idem = request.headers.get("x-idempotency-key") or request.headers.get("X-Idempotency-Key")
+    uid = str(user.id)
+    order = db.query(OrderModel).filter(OrderModel.id == body.order_id).first()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if str(order.user_id) != str(user.id):
+        raise HTTPException(403, "Order ownership mismatch")
+    try:
+        out = await orch.create_payment_session(
+            db,
+            order_id=body.order_id,
+            provider=body.provider,
+            user_id=uid,
+            idempotency_key=idem,
+            billing=body.billing,
+            paypal_return_url=body.paypal_return_url,
+            paypal_cancel_url=body.paypal_cancel_url,
+        )
+    except ValueError as e:
+        code = str(e)
+        if code == "ORDER_NOT_FOUND":
+            raise HTTPException(404, "Order not found") from e
+        if code == "ORDER_NOT_PAYABLE":
+            raise HTTPException(400, "Order is not payable") from e
+        if code == "STRIPE_NOT_CONFIGURED":
+            raise HTTPException(503, "Stripe is not configured") from e
+        if code == "AMOUNT_BELOW_STRIPE_MIN":
+            raise HTTPException(400, "Amount below Stripe minimum") from e
+        if code == "PAYPAL_URLS_REQUIRED":
+            raise HTTPException(400, "paypal_return_url and paypal_cancel_url required for PayPal") from e
+        if code.startswith("STRIPE_ERROR:"):
+            raise HTTPException(502, code) from e
+        if code.startswith("PAYMOB_ERROR:"):
+            raise HTTPException(502, code) from e
+        if code.startswith("PAYPAL_ERROR:"):
+            raise HTTPException(502, code) from e
+        if code.startswith("FAWRY_ERROR:"):
+            raise HTTPException(502, code) from e
+        if code.startswith("VALU_ERROR:"):
+            raise HTTPException(502, code) from e
+        if code == "STRIPE_NOT_AVAILABLE_FOR_EGYPT_EGP - Use Paymob or Fawry instead":
+            raise HTTPException(400, "Stripe not available for Egypt/EGP transactions. Use Paymob or Fawry instead") from e
+        raise HTTPException(400, code) from e
+
+    return out
+
+
+@router.post("/api/payments/unified/webhooks/paymob")
+@limiter.limit(LIMIT_WEBHOOK)
+async def webhook_paymob(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    obj_raw = form.get("obj") or form.get("object")
+    hmac_v = form.get("hmac") or form.get("HMAC")
+    if not obj_raw or not hmac_v:
+        raise HTTPException(400, "Missing obj or hmac")
+    try:
+        obj = json.loads(obj_raw) if isinstance(obj_raw, str) else dict(obj_raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, "Invalid obj JSON") from e
+
+    if not pm.verify_callback_hmac(obj, str(hmac_v)):
+        raise HTTPException(403, "Invalid HMAC")
+
+    tid = str(obj.get("id", ""))
+    fp = f"paymob:{tid}"
+    if db.query(PaymentEvent).filter(PaymentEvent.provider_event_fingerprint == fp).first():
+        return {"received": True, "duplicate": True}
+
+    success = str(obj.get("success", "")).lower() == "true"
+    order_nested = obj.get("order") or {}
+    paymob_oid = str(order_nested.get("id", ""))
+    pay = db.query(Payment).filter(Payment.external_payment_id == paymob_oid, Payment.provider == "paymob").first()
+    if not pay:
+        logger.warning("Paymob webhook: no payment row for paymob order %s", paymob_oid)
+        raise HTTPException(404, "Payment not found")
+
+    ev = PaymentEvent(
+        payment_id=pay.id,
+        event_type="paymob_transaction",
+        provider_event_fingerprint=fp,
+        payload=obj,
+        processed_ok=False,
+    )
+    db.add(ev)
+    db.flush()
+
+    if success:
+        orch.mark_payment_succeeded(db, pay, {"transaction": tid})
+    else:
+        orch.mark_payment_failed(db, pay, "paymob_declined")
+    db.query(PaymentEvent).filter(PaymentEvent.id == ev.id).update({"processed_ok": True})
+    db.commit()
+    return {"received": True}
+
+
+@router.post("/api/payments/unified/webhooks/paypal")
+@limiter.limit(LIMIT_WEBHOOK)
+async def webhook_paypal(request: Request, db: Session = Depends(get_db)):
+    body = await request.json()
+    headers = {k.lower(): v for k, v in request.headers.items()}
+    hdr = {
+        "paypal-transmission-id": headers.get("paypal-transmission-id", ""),
+        "paypal-transmission-time": headers.get("paypal-transmission-time", ""),
+        "paypal-cert-url": headers.get("paypal-cert-url", ""),
+        "paypal-auth-algo": headers.get("paypal-auth-algo", ""),
+        "paypal-transmission-sig": headers.get("paypal-transmission-sig", ""),
+    }
+    if not await pp.verify_webhook_signature(hdr, body):
+        raise HTTPException(403, "Invalid PayPal webhook signature")
+
+    et = body.get("event_type", "")
+    resource = body.get("resource") or {}
+    eid = str(body.get("id", ""))
+    fp = f"paypal:{eid}"
+    if db.query(PaymentEvent).filter(PaymentEvent.provider_event_fingerprint == fp).first():
+        return {"received": True, "duplicate": True}
+
+    ev = PaymentEvent(
+        payment_id=None,
+        event_type=et,
+        provider_event_fingerprint=fp,
+        payload=body,
+        processed_ok=False,
+    )
+    db.add(ev)
+    db.flush()
+
+    if et == "PAYMENT.CAPTURE.COMPLETED":
+        supp = resource.get("supplementary_data") or {}
+        rel = supp.get("related_ids") or {}
+        paypal_order_id = str(rel.get("order_id") or "")
+        pay = None
+        if paypal_order_id:
+            pay = db.query(Payment).filter(Payment.external_payment_id == paypal_order_id, Payment.provider == "paypal").first()
+        if pay:
+            ev.payment_id = pay.id
+            orch.mark_payment_succeeded(db, pay, {"webhook": et, "capture_id": resource.get("id")})
+            db.query(PaymentEvent).filter(PaymentEvent.id == ev.id).update({"processed_ok": True})
+        else:
+            logger.warning("PayPal webhook: no payment for order_id %s", paypal_order_id)
+    db.commit()
+    return {"received": True}
+
+
+@router.post("/api/payments/unified/webhooks/fawry")
+@limiter.limit(LIMIT_WEBHOOK)
+async def webhook_fawry(request: Request, db: Session = Depends(get_db)):
+    """Handle Fawry payment webhooks (MD5 signature verification)."""
+    body = await request.body()
+    signature = request.headers.get("fawry-signature", "") or request.headers.get("Fawry-Signature", "")
+    
+    if not fw.verify_webhook(body, signature):
+        raise HTTPException(403, "Invalid Fawry webhook signature")
+    
+    import json
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, "Invalid JSON body") from e
+    
+    reference_number = data.get("referenceNumber", "")
+    merchant_ref = data.get("merchantRefNum", "")
+    status_code = data.get("statusCode", "")
+    
+    fp = f"fawry:{reference_number}"
+    if db.query(PaymentEvent).filter(PaymentEvent.provider_event_fingerprint == fp).first():
+        return {"received": True, "duplicate": True}
+    
+    # Find payment by reference number or merchant ref
+    pay = db.query(Payment).filter(
+        (Payment.external_payment_id == reference_number) | 
+        (Payment.external_payment_id == merchant_ref),
+        Payment.provider == "fawry"
+    ).first()
+    
+    if not pay:
+        logger.warning("Fawry webhook: no payment for ref %s", reference_number)
+        # Still record the event for reconciliation
+        ev = PaymentEvent(
+            payment_id=None,
+            event_type="fawry_webhook_orphan",
+            provider_event_fingerprint=fp,
+            payload=data,
+            processed_ok=False,
+        )
+        db.add(ev)
+        db.commit()
+        raise HTTPException(404, "Payment not found")
+    
+    ev = PaymentEvent(
+        payment_id=pay.id,
+        event_type="fawry_callback",
+        provider_event_fingerprint=fp,
+        payload=data,
+        processed_ok=False,
+    )
+    db.add(ev)
+    db.flush()
+    
+    # Map Fawry status to payment status
+    if status_code == "PAID" or status_code == "SUCCESS":
+        orch.mark_payment_succeeded(db, pay, {"fawry_ref": reference_number})
+    elif status_code == "FAILED" or status_code == "DECLINED":
+        orch.mark_payment_failed(db, pay, f"fawry_{status_code.lower()}")
+    elif status_code == "EXPIRED":
+        orch.mark_payment_failed(db, pay, "fawry_expired")
+    elif status_code == "CANCELED":
+        orch.mark_payment_failed(db, pay, "fawry_canceled")
+    # For COD: status remains pending_cod until delivery confirmation
+    
+    db.query(PaymentEvent).filter(PaymentEvent.id == ev.id).update({"processed_ok": True})
+    db.commit()
+    return {"received": True}
+
+
+@router.post("/api/payments/unified/webhooks/valu")
+@limiter.limit(LIMIT_WEBHOOK)
+async def webhook_valu(request: Request, db: Session = Depends(get_db)):
+    """Handle Valu BNPL webhooks (routed through Paymob HMAC)."""
+    from services.payment_platform.providers import valu_provider as vu
+    
+    body = await request.body()
+    signature = request.headers.get("hmac", "") or request.headers.get("HMAC", "")
+    
+    if not vu.verify_webhook(body, signature):
+        raise HTTPException(403, "Invalid Valu webhook signature")
+    
+    import json
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, "Invalid JSON body") from e
+    
+    # Valu webhooks come through Paymob, so structure is similar
+    transaction_id = str(data.get("id", ""))
+    fp = f"valu:{transaction_id}"
+    
+    if db.query(PaymentEvent).filter(PaymentEvent.provider_event_fingerprint == fp).first():
+        return {"received": True, "duplicate": True}
+    
+    order_nested = data.get("order") or {}
+    paymob_oid = str(order_nested.get("id", ""))
+    pay = db.query(Payment).filter(
+        Payment.external_payment_id == paymob_oid,
+        Payment.provider == "valu"
+    ).first()
+    
+    if not pay:
+        logger.warning("Valu webhook: no payment for order %s", paymob_oid)
+        ev = PaymentEvent(
+            payment_id=None,
+            event_type="valu_webhook_orphan",
+            provider_event_fingerprint=fp,
+            payload=data,
+            processed_ok=False,
+        )
+        db.add(ev)
+        db.commit()
+        raise HTTPException(404, "Payment not found")
+    
+    ev = PaymentEvent(
+        payment_id=pay.id,
+        event_type="valu_callback",
+        provider_event_fingerprint=fp,
+        payload=data,
+        processed_ok=False,
+    )
+    db.add(ev)
+    db.flush()
+    
+    success = str(data.get("success", "")).lower() == "true"
+    if success:
+        orch.mark_payment_succeeded(db, pay, {"valu_transaction": transaction_id})
+    else:
+        orch.mark_payment_failed(db, pay, "valu_declined")
+    
+    db.query(PaymentEvent).filter(PaymentEvent.id == ev.id).update({"processed_ok": True})
+    db.commit()
+    return {"received": True}
+
+
+class PayPalCaptureBody(BaseModel):
+    paypal_order_id: str = Field(..., min_length=1)
+
+
+@router.post("/api/payments/unified/paypal/capture")
+@limiter.limit(LIMIT_PAYMENT)
+async def paypal_capture_after_return(
+    request: Request,
+    body: PayPalCaptureBody,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    if not user:
+        raise HTTPException(401, "Authentication required")
+    pay = db.query(Payment).filter(Payment.external_payment_id == body.paypal_order_id, Payment.provider == "paypal").first()
+    if not pay:
+        raise HTTPException(404, "Payment session not found")
+    order = db.query(OrderModel).filter(OrderModel.id == pay.order_id).first()
+    if order and str(order.user_id) != str(user.id):
+        raise HTTPException(403, "Order ownership mismatch")
+    try:
+        cap = await pp.capture_order(body.paypal_order_id)
+    except Exception as e:
+        logger.exception("PayPal capture failed")
+        raise HTTPException(502, str(e)) from e
+    status = cap.get("status")
+    if status == "COMPLETED":
+        orch.mark_payment_succeeded(db, pay, {"capture": cap})
+        return {"success": True, "status": status}
+    return {"success": False, "status": status}
+
+
+@router.get("/api/invoices/{invoice_id}")
+async def get_invoice_pdf(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    if inv.user_id:
+        if not user:
+            raise HTTPException(401, "Authentication required")
+        if str(inv.user_id) != str(user.id):
+            raise HTTPException(403, "Not allowed to access this invoice")
+    path = inv.pdf_storage_path
+    if not path:
+        raise HTTPException(404, "PDF missing")
+    import os
+
+    if not os.path.isfile(path):
+        raise HTTPException(404, "PDF file missing on disk")
+    return FileResponse(path, media_type="application/pdf", filename=f"{inv.invoice_number}.pdf")

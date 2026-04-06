@@ -1,0 +1,89 @@
+# ========================================
+# COUPON ENDPOINTS
+# ========================================
+
+@router.get("/coupons", response_model=List[PublicCouponResponse])
+async def list_visible_coupons(
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional),
+):
+    """List coupons visible to current user."""
+    user_id = current_user.user_id if current_user else None
+    user_category = None
+    
+    coupon_service = CouponService(db)
+    coupons = await coupon_service.list_visible_coupons(
+        user_id=user_id or "anonymous",
+        user_category=user_category,
+        limit=limit,
+    )
+    
+    return [
+        PublicCouponResponse(
+            id=c.id,
+            code=c.code,
+            type=c.type.value,
+            value=c.value,
+            min_cart_egp=c.min_cart_piastres / 100 if c.min_cart_piastres else None,
+            max_discount_egp=c.max_discount_piastres / 100 if c.max_discount_piastres else None,
+            donor_name=c.donor.display_name if c.donor and not c.donor.is_anonymous else None,
+            donor_message=c.donor_message,
+            valid_until=c.valid_until,
+        )
+        for c in coupons
+    ]
+
+
+@router.post("/coupons/validate", response_model=CouponValidateResponse)
+async def validate_coupon(
+    request: CouponValidateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional),
+):
+    """Validate a coupon code."""
+    user_id = current_user.user_id if current_user else "anonymous"
+    cart_piastres = int(request.cart_total_egp * 100)
+    
+    coupon_service = CouponService(db)
+    validation = await coupon_service.validate_coupon(
+        code=request.code,
+        user_id=user_id,
+        cart_total_piastres=cart_piastres,
+    )
+    
+    return CouponValidateResponse(
+        is_valid=validation.is_valid,
+        discount_egp=validation.discount_amount_piastres / 100,
+        error_reason=validation.error_reason,
+        coupon_type=validation.coupon.type.value if validation.coupon else None,
+    )
+
+
+@router.post("/coupons/redeem", response_model=CouponRedeemResponse)
+async def redeem_coupon(
+    request: CouponRedeemRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Redeem a coupon (requires authentication)."""
+    cart_piastres = int(request.cart_total_egp * 100)
+    
+    coupon_service = CouponService(db)
+    
+    try:
+        redemption = await coupon_service.redeem_coupon(
+            code=request.code,
+            user_id=user_id,
+            order_id=request.order_id,
+            cart_total_piastres=cart_piastres,
+        )
+        
+        return CouponRedeemResponse(
+            success=True,
+            discount_applied_egp=redemption.discount_applied_piastres / 100,
+            redemption_id=redemption.id,
+        )
+    except Exception as e:
+        logger.warning("Coupon redemption failed: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))

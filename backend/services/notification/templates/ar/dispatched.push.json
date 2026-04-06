@@ -1,0 +1,11 @@
+{
+  "title": "Order Dispatched",
+  "body": "Your order #{{ order_number }} is on its way!",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "dispatched",
+    "tracking_number": "{{ tracking_number }}",
+    "tracking_url": "{{ tracking_url }}"
+  }
+}

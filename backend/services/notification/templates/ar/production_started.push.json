@@ -1,0 +1,9 @@
+{
+  "title": "Production Started",
+  "body": "Your order #{{ order_number }} is now in production.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "production_started"
+  }
+}

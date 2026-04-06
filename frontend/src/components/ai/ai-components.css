@@ -1,0 +1,9 @@
+/* CONFIT Frontend - AI Components Styles */
+
+/* Quality score progress bar - replaces inline style */
+.quality-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background-color: #22c55e;
+  transition: width 0.3s ease;
+}

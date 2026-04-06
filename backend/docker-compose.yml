@@ -1,0 +1,428 @@
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # APPLICATION SERVICES
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: confit-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-confit}:${POSTGRES_PASSWORD:-confit123}@postgres:5432/${POSTGRES_DB:-confit}
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production-min-32-chars}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - JWT_REFRESH_EXPIRY_DAYS=${JWT_REFRESH_EXPIRY_DAYS:-7}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - OAUTH_GOOGLE_CLIENT_ID=${OAUTH_GOOGLE_CLIENT_ID}
+      - OAUTH_GOOGLE_CLIENT_SECRET=${OAUTH_GOOGLE_CLIENT_SECRET}
+      - OAUTH_FACEBOOK_CLIENT_ID=${OAUTH_FACEBOOK_CLIENT_ID}
+      - OAUTH_FACEBOOK_CLIENT_SECRET=${OAUTH_FACEBOOK_CLIENT_SECRET}
+      - OAUTH_APPLE_CLIENT_ID=${OAUTH_APPLE_CLIENT_ID}
+      - OAUTH_APPLE_CLIENT_SECRET=${OAUTH_APPLE_CLIENT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PENTAGI_URL=${PENTAGI_URL:-https://pentagi:8443}
+      - PENTAGI_API_TOKEN=${PENTAGI_API_TOKEN}
+      - PENTAGI_SSL_VERIFY=${PENTAGI_SSL_VERIFY:-true}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_TRYON_MODEL=${GEMINI_TRYON_MODEL:-}
+      - GEMINI_API_BASE=${GEMINI_API_BASE:-}
+      - TRYON_GATEWAY_PROVIDER=${TRYON_GATEWAY_PROVIDER:-auto}
+      - LOVABLE_API_KEY=${LOVABLE_API_KEY:-}
+      - AI_GATEWAY_URL=${AI_GATEWAY_URL:-}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      pentagi-pgvector:
+        condition: service_healthy
+      pentagi:
+        condition: service_started
+    networks:
+      - confit-network
+      - pentagi-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CELERY WORKERS
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: confit-celery-worker
+    restart: unless-stopped
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=4
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-confit}:${POSTGRES_PASSWORD:-confit123}@postgres:5432/${POSTGRES_DB:-confit}
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - confit-network
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: confit-celery-beat
+    restart: unless-stopped
+    command: celery -A workers.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-confit}:${POSTGRES_PASSWORD:-confit123}@postgres:5432/${POSTGRES_DB:-confit}
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - confit-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # DATABASE SERVICES
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: confit-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-confit}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-confit123}
+      - POSTGRES_DB=${POSTGRES_DB:-confit}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-confit} -d ${POSTGRES_DB:-confit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: confit-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SEARCH ENGINE
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: confit-elasticsearch
+    restart: unless-stopped
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+      - "9300:9300"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # MONITORING
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: confit-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - confit-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: confit-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - confit-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # AI SECURITY SERVICES (PentAGI)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  pentagi-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: confit-pentagi-pgvector
+    restart: unless-stopped
+    expose:
+      - 5432/tcp
+    environment:
+      POSTGRES_USER: ${PENTAGI_POSTGRES_USER:-pentagi}
+      POSTGRES_PASSWORD: ${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}
+      POSTGRES_DB: ${PENTAGI_POSTGRES_DB:-pentagidb}
+    volumes:
+      - pentagi_postgres_data:/var/lib/postgresql/data
+    networks:
+      - pentagi-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PENTAGI_POSTGRES_USER:-pentagi} -d ${PENTAGI_POSTGRES_DB:-pentagidb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pentagi:
+    image: vxcontrol/pentagi:latest
+    container_name: confit-pentagi
+    restart: unless-stopped
+    expose:
+      - 8443/tcp
+    env_file:
+      - ../ai-security/pentagi/.env
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PENTAGI_API_TOKEN=${PENTAGI_API_TOKEN}
+      - PENTAGI_POSTGRES_PASSWORD=${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}
+      - DATABASE_URL=postgresql://${PENTAGI_POSTGRES_USER:-pentagi}:${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}@pentagi-pgvector:5432/${PENTAGI_POSTGRES_DB:-pentagidb}?sslmode=disable
+      - PENTAGI_SCRAPER_PRIVATE_URL=${PENTAGI_SCRAPER_PRIVATE_URL:-}
+      - PENTAGI_SCRAPER_USERNAME=${PENTAGI_SCRAPER_USERNAME:-}
+      - PENTAGI_SCRAPER_PASSWORD=${PENTAGI_SCRAPER_PASSWORD:-}
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+    volumes:
+      - pentagi_data:/app/data
+      - pentagi_reports:/app/reports
+      - pentagi_ssl:/app/ssl
+      - ../ai-security/pentagi/deepseek.provider.yml:/app/config/provider.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - confit-network
+      - pentagi-internal
+    # No healthcheck - container is considered healthy when running
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  pentagi-worker:
+    image: vxcontrol/pentagi:latest
+    container_name: confit-pentagi-worker
+    restart: unless-stopped
+    command: ["python", "-m", "pentagi.worker"]
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+      pentagi:
+        condition: service_started
+    env_file:
+      - ../ai-security/pentagi/.env
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PENTAGI_API_TOKEN=${PENTAGI_API_TOKEN}
+      - PENTAGI_POSTGRES_PASSWORD=${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}
+      - DATABASE_URL=postgresql://${PENTAGI_POSTGRES_USER:-pentagi}:${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}@pentagi-pgvector:5432/${PENTAGI_POSTGRES_DB:-pentagidb}?sslmode=disable
+      - PENTAGI_SCRAPER_PRIVATE_URL=${PENTAGI_SCRAPER_PRIVATE_URL:-}
+      - PENTAGI_SCRAPER_USERNAME=${PENTAGI_SCRAPER_USERNAME:-}
+      - PENTAGI_SCRAPER_PASSWORD=${PENTAGI_SCRAPER_PASSWORD:-}
+    volumes:
+      - pentagi_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - confit-network
+      - pentagi-internal
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  pentest-sandbox:
+    image: vxcontrol/kali-linux:latest
+    container_name: confit-pentest-sandbox
+    restart: "no"
+    command: ["sleep", "infinity"]
+    networks:
+      - confit-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /run
+    profiles:
+      - pentest
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # REVERSE PROXY (Production)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  nginx:
+    image: nginx:alpine
+    container_name: confit-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./uploads:/var/www/uploads:ro
+    depends_on:
+      - api
+    networks:
+      - confit-network
+    profiles:
+      - production
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  confit-network:
+    driver: bridge
+  pentagi-internal:
+    driver: bridge
+    internal: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pentagi_data:
+    driver: local
+  pentagi_reports:
+    driver: local
+  pentagi_ssl:
+    driver: local
+  pentagi_postgres_data:
+    driver: local

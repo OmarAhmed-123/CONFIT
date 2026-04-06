@@ -1,0 +1,1 @@
+CONFIT: Order #{{ order_number }} confirmed. {{ product_name }} (x{{ quantity }}). Track: {{ action_url }}

@@ -1,0 +1,238 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONFIT Security Services — Docker Compose Overlay
+# ═══════════════════════════════════════════════════════════════════════════════
+# Usage: docker compose -f docker-compose.yml -f docker-compose.security.yml up --build
+#
+# This overlay adds PentAGI AI penetration testing services to the CONFIT stack.
+# All services run on isolated internal networks with no public exposure
+# except the PentAGI UI port (configurable).
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PentAGI — AI Penetration Testing Platform
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  pentagi-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: confit-pentagi-pgvector
+    restart: unless-stopped
+    expose:
+      - 5432/tcp
+    environment:
+      POSTGRES_USER: ${PENTAGI_POSTGRES_USER:-pentagi}
+      POSTGRES_PASSWORD: ${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}
+      POSTGRES_DB: ${PENTAGI_POSTGRES_DB:-pentagidb}
+    volumes:
+      - pentagi-postgres-data:/var/lib/postgresql/data
+    networks:
+      - pentagi-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PENTAGI_POSTGRES_USER:-pentagi} -d ${PENTAGI_POSTGRES_DB:-pentagidb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pentagi:
+    image: ${PENTAGI_IMAGE:-vxcontrol/pentagi:latest}
+    restart: unless-stopped
+    container_name: confit-pentagi
+    hostname: pentagi
+    ports:
+      - "${PENTAGI_LISTEN_PORT:-8443}:8443"
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+    env_file:
+      - ../ai-security/pentagi/.env
+    environment:
+      # Database
+      - DATABASE_URL=postgres://${PENTAGI_POSTGRES_USER:-pentagi}:${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}@pentagi-pgvector:5432/${PENTAGI_POSTGRES_DB:-pentagidb}?sslmode=disable
+      # AI Providers
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_SERVER_URL=${DEEPSEEK_SERVER_URL:-https://api.deepseek.com}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # Security APIs
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY}
+      # Server Config
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8443
+      - SSL_VERIFY=${PENTAGI_SSL_VERIFY:-false}
+      # API Token
+      - PENTAGI_API_TOKEN=${PENTAGI_API_TOKEN}
+      # Docker Config
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DOCKER_NETWORK=confit-network
+      - DOCKER_DEFAULT_IMAGE=debian:latest
+      - DOCKER_DEFAULT_IMAGE_FOR_PENTEST=vxcontrol/kali-linux
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    volumes:
+      - pentagi-data:/opt/pentagi/data
+      - pentagi-ssl:/opt/pentagi/ssl
+      - pentagi-reports:/opt/pentagi/reports
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../ai-security/pentagi/deepseek.provider.yml:/opt/pentagi/conf/provider.yml:ro
+      - ../ai-security/pentagi/example.custom.provider.yml:/opt/pentagi/conf/custom.provider.yml:ro
+      - ../ai-security/pentagi/example.ollama.provider.yml:/opt/pentagi/conf/ollama.provider.yml:ro
+    user: root:root
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - confit-network
+      - pentagi-internal
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "--spider", "-q", "https://localhost:8443/api/v1/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PentAGI Worker
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  pentagi-worker:
+    image: ${PENTAGI_IMAGE:-vxcontrol/pentagi:latest}
+    restart: unless-stopped
+    container_name: confit-pentagi-worker
+    hostname: pentagi-worker
+    command: ["python", "-m", "pentagi.worker"]
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+      pentagi:
+        condition: service_healthy
+    env_file:
+      - ../ai-security/pentagi/.env
+    environment:
+      # Database
+      - DATABASE_URL=postgres://${PENTAGI_POSTGRES_USER:-pentagi}:${PENTAGI_POSTGRES_PASSWORD:-your-secure-password-here}@pentagi-pgvector:5432/${PENTAGI_POSTGRES_DB:-pentagidb}?sslmode=disable
+      # AI Providers
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_SERVER_URL=${DEEPSEEK_SERVER_URL:-https://api.deepseek.com}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # Security APIs
+      - SHODAN_API_KEY=${SHODAN_API_KEY}
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY}
+      # Docker Config
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DOCKER_NETWORK=confit-network
+      - DOCKER_DEFAULT_IMAGE=debian:latest
+      - DOCKER_DEFAULT_IMAGE_FOR_PENTEST=vxcontrol/kali-linux
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    volumes:
+      - pentagi-data:/opt/pentagi/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    user: root:root
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    networks:
+      - confit-network
+      - pentagi-internal
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PentAGI Web Scraper (Isolated)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  pentagi-scraper:
+    image: vxcontrol/scraper:latest
+    restart: unless-stopped
+    container_name: confit-pentagi-scraper
+    hostname: pentagi-scraper
+    expose:
+      - 443/tcp
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - USERNAME=scraper_user
+      - PASSWORD=scraper_pass
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    volumes:
+      - pentagi-scraper-ssl:/usr/src/app/ssl
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 256M
+    networks:
+      - pentagi-internal
+    shm_size: 2g
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Override: CONFIT API depends on PentAGI
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  api:
+    depends_on:
+      pentagi:
+        condition: service_healthy
+    environment:
+      - PENTAGI_URL=https://pentagi:8443
+      - PENTAGI_API_TOKEN=${PENTAGI_API_TOKEN:-}
+      - PENTAGI_SSL_VERIFY=false
+    networks:
+      - confit-network
+      - pentagi-internal
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  pentagi-internal:
+    driver: bridge
+    internal: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+volumes:
+  pentagi-data:
+    driver: local
+  pentagi-ssl:
+    driver: local
+  pentagi-reports:
+    driver: local
+  pentagi-postgres-data:
+    driver: local
+  pentagi-scraper-ssl:
+    driver: local

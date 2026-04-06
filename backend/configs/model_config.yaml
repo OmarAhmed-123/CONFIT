@@ -1,0 +1,132 @@
+# CONFIT Model Configuration
+# ==========================
+# Configuration for all ML models used in virtual try-on
+
+tryon:
+  # Default model to use
+  default_model: idm_vton
+  
+  # Model-specific configurations
+  models:
+    # IDM-VTON: Best quality, ~8s inference
+    idm_vton:
+      path: weights/idm_vton
+      device: cuda
+      precision: fp16
+      image_size:
+        - 512
+        - 384
+      inference_time_ms: 8000
+      batch_size: 1
+      
+    # VITON-HD: Faster inference, ~3s
+    viton_hd:
+      path: weights/viton_hd
+      device: cuda
+      precision: fp16
+      image_size:
+        - 512
+        - 384
+      inference_time_ms: 3000
+      batch_size: 1
+      
+    # HuggingFace API fallback
+    huggingface:
+      model_id: "IDM-VTON/IDM-VTON"
+      api_token: ${HUGGINGFACE_TOKEN}
+      timeout_seconds: 30
+      retry_attempts: 3
+
+# Pose Detection Configuration
+pose_detection:
+  model: mediapipe
+  complexity: 1  # 0 (lite), 1 (full), 2 (heavy)
+  smooth_landmarks: true
+  enable_segmentation: false
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  
+  # Alternative: MMPose
+  mmpose:
+    config: configs/body/2d_kpt_sview_rgb_img/topdown_heatmap/coco/hrnet_w48_coco_256x192.py
+    checkpoint: checkpoints/hrnet_w48_coco_256x192.pth
+
+# Segmentation Configuration
+segmentation:
+  model: sam  # sam or schp
+  
+  # Segment Anything Model
+  sam:
+    variant: vit_h  # vit_h, vit_l, vit_b
+    checkpoint: weights/sam_vit_h.pth
+    device: cuda
+    
+  # Self-Correction Human Parsing
+  schp:
+    checkpoint: weights/schp.pth
+    device: cuda
+    num_classes: 20
+
+# Cloth Warping Configuration
+cloth_warping:
+  method: tps  # tps (Thin Plate Spline) or flow
+  tps:
+    control_points: auto
+    regularization: 0.1
+    
+# Quality Validation Configuration
+quality_validation:
+  enabled: true
+  threshold: 0.65
+  
+  metrics:
+    realism:
+      weight: 0.30
+      threshold: 0.6
+    edge_quality:
+      weight: 0.25
+      threshold: 0.6
+    color_consistency:
+      weight: 0.20
+      threshold: 0.6
+    proportion:
+      weight: 0.15
+      threshold: 0.6
+    artifact:
+      weight: 0.10
+      threshold: 0.5
+
+# Post-Processing Configuration
+post_processing:
+  edge_refinement:
+    enabled: true
+    method: guided_filter
+    radius: 5
+    eps: 0.01
+    
+  color_harmonization:
+    enabled: true
+    method: lab_match
+    
+  shadow_synthesis:
+    enabled: true
+    intensity: 0.2
+
+# GPU Configuration
+gpu:
+  device: cuda:0
+  memory_fraction: 0.8
+  allow_growth: true
+  
+  # Memory management
+  clear_cache_interval: 300  # seconds
+  max_tasks_before_restart: 10
+
+# Caching Configuration
+cache:
+  enabled: true
+  backend: redis
+  ttl:
+    models: 86400  # 24 hours
+    results: 3600   # 1 hour
+    preprocessing: 7200  # 2 hours

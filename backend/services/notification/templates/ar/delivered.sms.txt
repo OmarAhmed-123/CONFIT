@@ -1,0 +1,1 @@
+CONFIT: Order #{{ order_number }} delivered. Thank you for shopping with us!

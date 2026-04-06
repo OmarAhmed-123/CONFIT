@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  tryon-gpu:
+    build:
+      context: ../..
+      dockerfile: docker/tryon-gpu/Dockerfile
+    ports:
+      - "8011:8011"
+    environment:
+      TRYON_REMOTE_API_KEY: ${TRYON_REMOTE_API_KEY:-}
+      TRYON_REMOTE_AUTH_SCHEME: Bearer
+      TRYON_REMOTE_MOCK_HOST: 0.0.0.0
+      TRYON_REMOTE_MOCK_PORT: 8011
+

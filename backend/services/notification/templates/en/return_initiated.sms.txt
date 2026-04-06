@@ -1,0 +1,1 @@
+CONFIT: Return request for order #{{ order_number }} received. We'll process it shortly.

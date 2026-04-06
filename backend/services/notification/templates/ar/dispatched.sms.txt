@@ -1,0 +1,1 @@
+CONFIT: Order #{{ order_number }} dispatched! Track: {{ tracking_url }}

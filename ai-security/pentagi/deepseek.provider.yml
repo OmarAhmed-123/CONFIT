@@ -1,0 +1,21 @@
+# DeepSeek Provider Configuration for PentAGI
+# This configures PentAGI to use DeepSeek as the primary AI provider
+
+provider:
+  name: "deepseek"
+  base_url: "https://api.deepseek.com"
+  api_key: "${DEEPSEEK_API_KEY}"
+  models:
+    - name: "deepseek-chat"
+      max_tokens: 8192
+      temperature: 0.7
+    - name: "deepseek-reasoner"
+      max_tokens: 16384
+      temperature: 0.5
+
+# Security-focused model configuration
+security:
+  default_model: "deepseek-chat"
+  reasoning_model: "deepseek-reasoner"
+  max_retries: 3
+  timeout: 120

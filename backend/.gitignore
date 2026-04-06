@@ -1,0 +1,15 @@
+# Secrets
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Local DBs
+*.db
+*.sqlite
+*.sqlite3
+
+# Keys / certs
+*.pem
+*.key
+secrets/

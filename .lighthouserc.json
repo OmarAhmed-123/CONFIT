@@ -1,0 +1,182 @@
+# ============================================================
+# CONFIT — Lighthouse CI Configuration
+# Target: Lighthouse 95+ scores
+# ============================================================
+
+ci:
+  collect:
+    # Number of runs to average
+    numberOfRuns: 3
+    
+    # Settings for consistent results
+    settings:
+      # Performance budgets
+      maxWaitForLoad: 45000
+      throttling:
+        rttMs: 40
+        throughputKbps: 10240
+        cpuSlowdownMultiplier: 1
+      
+      # Categories to test
+      onlyCategories:
+        - performance
+        - accessibility
+        - best-practices
+        - seo
+      
+      # Skip audits that aren't applicable
+      skipAudits:
+        - 'canonical'
+        - 'robots-txt'  # Handled separately
+      
+      # Pre-render if needed
+      staticDistDir: './dist'
+      
+    # URLs to test
+    url:
+      - http://localhost:8080/
+      - http://localhost:8080/discover
+      - http://localhost:8080/brands
+      - http://localhost:8080/stylist
+      - http://localhost:8080/try-on
+      - http://localhost:8080/outfits
+      - http://localhost:8080/wardrobe
+      - http://localhost:8080/product/test-product
+
+  assert:
+    # Assertions for Lighthouse 95+ target
+    assertions:
+      # Performance assertions
+      'categories:performance':
+        minScore: 0.95
+      
+      # Accessibility assertions
+      'categories:accessibility':
+        minScore: 0.95
+      
+      # SEO assertions
+      'categories:seo':
+        minScore: 0.95
+      
+      # Best practices assertions
+      'categories:best-practices':
+        minScore: 0.95
+      
+      # Core Web Vitals
+      'metrics:first-contentful-paint':
+        maxNumericValue: 1500
+      
+      'metrics:largest-contentful-paint':
+        maxNumericValue: 2500
+      
+      'metrics:cumulative-layout-shift':
+        maxNumericValue: 0.1
+      
+      'metrics:total-blocking-time':
+        maxNumericValue: 200
+      
+      'metrics:speed-index':
+        maxNumericValue: 3000
+      
+      # Performance optimizations
+      'unused-javascript':
+        maxNumericValue: 20000
+      
+      'unused-css-rules':
+        maxNumericValue: 5000
+      
+      'unminified-javascript':
+        maxNumericValue: 0
+      
+      'unminified-css':
+        maxNumericValue: 0
+      
+      'unused-javascript':
+        maxNumericValue: 15000
+      
+      'modern-image-formats':
+        minScore: 0.9
+      
+      'uses-text-compression':
+        minScore: 1
+      
+      'uses-responsive-images':
+        minScore: 0.9
+      
+      'efficient-animated-content':
+        minScore: 1
+      
+      # Accessibility checks
+      'color-contrast':
+        minScore: 1
+      
+      'document-title':
+        minScore: 1
+      
+      'meta-description':
+        minScore: 1
+      
+      'html-has-lang':
+        minScore: 1
+      
+      'image-alt':
+        minScore: 1
+      
+      'label':
+        minScore: 1
+      
+      'link-name':
+        minScore: 1
+      
+      'object-alt':
+        minScore: 1
+      
+      'aria-allowed-attr':
+        minScore: 1
+      
+      'aria-hidden-body':
+        minScore: 1
+      
+      'aria-hidden-focus':
+        minScore: 1
+      
+      'aria-required-attr':
+        minScore: 1
+      
+      'aria-required-children':
+        minScore: 1
+      
+      'aria-valid-attr':
+        minScore: 1
+      
+      'aria-valid-attr-value':
+        minScore: 1
+      
+      # SEO checks
+      'meta-viewport':
+        minScore: 1
+      
+      'document-title':
+        minScore: 1
+      
+      'meta-description':
+        minScore: 1
+      
+      'link-text':
+        minScore: 0.95
+      
+      'http-status-code':
+        minScore: 1
+
+  upload:
+    # Upload to Lighthouse CI server (optional)
+    target: temporary-public-storage
+    
+    # Or use:
+    # target: lhci
+    # serverBaseUrl: https://your-lhci-server.example.com
+
+  # Notifications (optional)
+  notify:
+    # Slack webhook for CI failures
+    # slackWebhookUrl: $SLACK_WEBHOOK_URL

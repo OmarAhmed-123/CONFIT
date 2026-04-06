@@ -1,0 +1,365 @@
+# CONFIT Authentication Tests - GitHub Actions Workflow
+# =====================================================
+# Runs the full Playwright auth test suite before deployment.
+# Sets required environment variables from GitHub Secrets.
+
+name: Auth Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'backend/**'
+      - 'e2e/auth-*.spec.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/auth-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'backend/**'
+      - 'e2e/auth-*.spec.ts'
+      - 'playwright.config.ts'
+  workflow_dispatch:
+    inputs:
+      browsers:
+        description: 'Browsers to test (comma-separated: chromium,firefox,webkit,ios-safari,android-chrome)'
+        required: false
+        default: 'chromium,firefox,webkit'
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+  PLAYWRIGHT_BASE_URL: http://localhost:8080
+  PLAYWRIGHT_API_URL: http://localhost:8000
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # SETUP & INSTALL
+  # ───────────────────────────────────────────────────────────────────────────
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # AUTH TESTS - CHROMIUM
+  # ───────────────────────────────────────────────────────────────────────────
+  test-chromium:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd backend && pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test << EOF
+          # OAuth credentials from GitHub Secrets
+          OAUTH_GOOGLE_CLIENT_ID=${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          OAUTH_GOOGLE_CLIENT_SECRET=${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }}
+          OAUTH_APPLE_CLIENT_ID=${{ secrets.OAUTH_APPLE_CLIENT_ID }}
+          OAUTH_APPLE_CLIENT_SECRET=${{ secrets.OAUTH_APPLE_CLIENT_SECRET }}
+          
+          # Test user credentials
+          TEST_USER_EMAIL=${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD=${{ secrets.TEST_USER_PASSWORD }}
+          
+          # API URLs
+          PLAYWRIGHT_BASE_URL=${{ env.PLAYWRIGHT_BASE_URL }}
+          PLAYWRIGHT_API_URL=${{ env.PLAYWRIGHT_API_URL }}
+          EOF
+
+      - name: Start backend server
+        run: |
+          cd backend
+          cp .env.example .env
+          source .venv/bin/activate 2>/dev/null || true
+          python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+        continue-on-error: true
+
+      - name: Start frontend server
+        run: |
+          npm run dev &
+          sleep 10
+        continue-on-error: true
+
+      - name: Run auth tests (Chromium)
+        run: npx playwright test --project=chromium --grep="auth-"
+        env:
+          OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }}
+          OAUTH_APPLE_CLIENT_ID: ${{ secrets.OAUTH_APPLE_CLIENT_ID }}
+          OAUTH_APPLE_CLIENT_SECRET: ${{ secrets.OAUTH_APPLE_CLIENT_SECRET }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-chromium
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshots-chromium
+          path: test-results/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # AUTH TESTS - FIREFOX
+  # ───────────────────────────────────────────────────────────────────────────
+  test-firefox:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install firefox --with-deps
+
+      - name: Start services
+        run: |
+          cd backend && pip install -r requirements.txt
+          python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
+          npm run dev &
+          sleep 15
+        continue-on-error: true
+
+      - name: Run auth tests (Firefox)
+        run: npx playwright test --project=firefox --grep="auth-"
+        env:
+          OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          OAUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.OAUTH_GOOGLE_CLIENT_SECRET }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-firefox
+          path: playwright-report/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # AUTH TESTS - WEBKIT (Safari)
+  # ───────────────────────────────────────────────────────────────────────────
+  test-webkit:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install webkit --with-deps
+
+      - name: Start services
+        run: |
+          cd backend && pip install -r requirements.txt
+          python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
+          npm run dev &
+          sleep 15
+        continue-on-error: true
+
+      - name: Run auth tests (WebKit)
+        run: npx playwright test --project=webkit --grep="auth-"
+        env:
+          OAUTH_GOOGLE_CLIENT_ID: ${{ secrets.OAUTH_GOOGLE_CLIENT_ID }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-webkit
+          path: playwright-report/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # AUTH TESTS - MOBILE EMULATION
+  # ───────────────────────────────────────────────────────────────────────────
+  test-mobile:
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Start services
+        run: |
+          cd backend && pip install -r requirements.txt
+          python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
+          npm run dev &
+          sleep 15
+        continue-on-error: true
+
+      - name: Run auth tests (iOS Safari emulation)
+        run: npx playwright test --project=ios-safari --grep="auth-email-autocomplete"
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Run auth tests (Android Chrome emulation)
+        run: npx playwright test --project=android-chrome --grep="auth-email-autocomplete"
+        env:
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mobile
+          path: playwright-report/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # COMBINED REPORT
+  # ───────────────────────────────────────────────────────────────────────────
+  report:
+    needs: [test-chromium, test-firefox, test-webkit, test-mobile]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+
+      - name: Merge test reports
+        run: |
+          mkdir -p merged-report
+          cp -r all-reports/playwright-report-chromium/* merged-report/ 2>/dev/null || true
+          cp -r all-reports/playwright-report-firefox/* merged-report/ 2>/dev/null || true
+          cp -r all-reports/playwright-report-webkit/* merged-report/ 2>/dev/null || true
+          cp -r all-reports/playwright-report-mobile/* merged-report/ 2>/dev/null || true
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-all-browsers
+          path: merged-report/
+          retention-days: 30
+
+      - name: Generate summary
+        run: |
+          echo "## Auth Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Chromium | ${{ needs.test-chromium.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firefox | ${{ needs.test-firefox.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| WebKit (Safari) | ${{ needs.test-webkit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mobile (iOS/Android) | ${{ needs.test-mobile.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # DEPLOYMENT GATE
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-gate:
+    needs: [test-chromium, test-firefox, test-webkit, test-mobile]
+    runs-on: ubuntu-latest
+    if: success() && github.ref == 'refs/heads/main'
+    steps:
+      - name: All tests passed
+        run: |
+          echo "✅ All auth tests passed across all browsers"
+          echo "Ready for deployment"
+
+      # Add your deployment steps here
+      # - name: Deploy to production
+      #   run: ./deploy.sh

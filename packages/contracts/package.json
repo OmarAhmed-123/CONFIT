@@ -1,0 +1,35 @@
+{
+  "name": "@confit/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./payment": {
+      "types": "./dist/payment.d.ts",
+      "import": "./dist/payment.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "confit": "file:../..",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

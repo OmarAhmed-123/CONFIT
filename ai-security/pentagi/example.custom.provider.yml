@@ -1,0 +1,11 @@
+# Custom OpenAI-compatible provider configuration
+# This file is mounted into the PentAGI container
+# Uncomment and configure if using a custom LLM provider
+
+# provider:
+#   name: "custom-provider"
+#   base_url: "http://your-llm-server:8080/v1"
+#   api_key: "your-key"
+#   models:
+#     - name: "your-model-name"
+#       max_tokens: 4096

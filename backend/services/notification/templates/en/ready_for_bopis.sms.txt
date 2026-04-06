@@ -1,0 +1,1 @@
+CONFIT: Order #{{ order_number }} ready at {{ store_name }}. Pickup: {{ pickup_window }}. {{ store_address }}

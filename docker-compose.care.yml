@@ -1,0 +1,256 @@
+# CONFIT CARE - Docker Compose Configuration
+# ===========================================
+# Production-ready deployment configuration for CONFIT CARE system
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # Backend API Service
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        - ENVIRONMENT=production
+    container_name: confit-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://confit:${DB_PASSWORD}@postgres:5432/confit_prod
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRY_HOURS=24
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - RATE_LIMIT_ENABLED=true
+      - AI_ENABLED=true
+      - TRY_ON_ENABLED=true
+    volumes:
+      - ./backend/logs:/app/logs
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # Frontend Service
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${API_URL}
+        - VITE_ENVIRONMENT=production
+    container_name: confit-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=${API_URL}
+      - VITE_ENVIRONMENT=production
+    depends_on:
+      - backend
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: confit-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=confit
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=confit_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U confit -d confit_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Redis Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: confit-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # ==========================================
+  # Celery Worker (Background Tasks)
+  # ==========================================
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    container_name: confit-celery-worker
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://confit:${DB_PASSWORD}@postgres:5432/confit_prod
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    volumes:
+      - ./backend/logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - confit-network
+    command: celery -A core.celery_app worker --loglevel=info --concurrency=4
+
+  # ==========================================
+  # Celery Beat (Scheduled Tasks)
+  # ==========================================
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+    container_name: confit-celery-beat
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://confit:${DB_PASSWORD}@postgres:5432/confit_prod
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    volumes:
+      - ./backend/logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - confit-network
+    command: celery -A core.celery_app beat --loglevel=info
+
+  # ==========================================
+  # Nginx Reverse Proxy
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: confit-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # Prometheus (Monitoring)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: confit-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - confit-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  # ==========================================
+  # Grafana (Visualization)
+  # ==========================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: confit-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - confit-network
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  confit-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

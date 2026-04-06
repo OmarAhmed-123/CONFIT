@@ -1,0 +1,180 @@
+{
+  "summary": {
+    "total": 19,
+    "pass": 19,
+    "fail": 0
+  },
+  "results": [
+    {
+      "role": "customer",
+      "feature": "auth_me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "products",
+      "method": "GET",
+      "path": "/api/products/featured?limit=3&gender=women",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "orders",
+      "method": "GET",
+      "path": "/api/orders",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "notifications_customer",
+      "method": "GET",
+      "path": "/api/notifications/customer",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "notification_prefs_get",
+      "method": "GET",
+      "path": "/api/notification-preferences",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "analytics_overview",
+      "method": "GET",
+      "path": "/api/analytics/overview",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "stylist_chat",
+      "method": "POST",
+      "path": "/api/stylist/chat",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "customer",
+      "feature": "tryon_capabilities",
+      "method": "GET",
+      "path": "/api/tryon/capabilities",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "stores",
+      "method": "GET",
+      "path": "/api/stores",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "sales_analytics",
+      "method": "GET",
+      "path": "/api/sales-analytics",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "owner_notifications",
+      "method": "GET",
+      "path": "/api/notifications",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "notif_prefs_update",
+      "method": "PUT",
+      "path": "/api/notification-preferences",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "payment_config",
+      "method": "GET",
+      "path": "/api/payments/config",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "owner",
+      "feature": "payment_intent",
+      "method": "POST",
+      "path": "/api/payments/intent",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "admin",
+      "feature": "debug_health",
+      "method": "GET",
+      "path": "/debug/health",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "admin",
+      "feature": "debug_alerts",
+      "method": "GET",
+      "path": "/debug/alerts",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "admin",
+      "feature": "debug_scheduler",
+      "method": "GET",
+      "path": "/debug/scheduler/status",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "admin",
+      "feature": "debug_logs",
+      "method": "GET",
+      "path": "/api/debug/logs?limit=5",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "role": "admin",
+      "feature": "analytics_metrics",
+      "method": "GET",
+      "path": "/api/analytics/metrics",
+      "status": 200,
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

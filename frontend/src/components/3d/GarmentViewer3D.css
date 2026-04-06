@@ -1,0 +1,22 @@
+.garment-color-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.garment-color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.garment-color-swatch-selected {
+  border-color: hsl(var(--accent));
+  transform: scale(1.1);
+}
+
+.garment-color-swatch-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

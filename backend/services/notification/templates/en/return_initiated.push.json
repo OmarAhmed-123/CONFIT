@@ -1,0 +1,10 @@
+{
+  "title": "Return Initiated",
+  "body": "Your return request for order #{{ order_number }} has been received.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "return_initiated",
+    "reason": "{{ reason }}"
+  }
+}

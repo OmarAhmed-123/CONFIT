@@ -1,0 +1,117 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIT AI Services - GPU-enabled Docker Image
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-stage build for optimized AI inference
+# CUDA 12.1 + PyTorch 2.1 + Transformers
+
+# Stage 1: Base with CUDA
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS base
+
+LABEL maintainer="CONFIT Team"
+LABEL description="GPU-enabled AI services for fashion platform"
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3-pip \
+    python3.10-dev \
+    python3.10-venv \
+    git \
+    curl \
+    wget \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libjpeg-dev \
+    libpng-dev \
+    libpq-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.10 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 \
+    && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: Builder
+FROM base AS builder
+
+WORKDIR /build
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA 12.1 support
+RUN pip install --no-cache-dir \
+    torch==2.1.0+cu121 \
+    torchvision==0.16.0+cu121 \
+    torchaudio==2.1.0+cu121 \
+    --index-url https://download.pytorch.org/whl/cu121
+
+# Install core ML dependencies
+RUN pip install --no-cache-dir \
+    transformers==4.35.0 \
+    accelerate==0.24.0 \
+    diffusers==0.23.0 \
+    xformers==0.0.22+cu121 \
+    --find-links https://github.com/facebookresearch/xformers/releases
+
+# Install additional ML libraries
+RUN pip install --no-cache-dir \
+    mediapipe==0.10.8 \
+    opencv-python-headless==4.8.1.78 \
+    scikit-learn==1.3.2 \
+    scipy==1.11.4 \
+    sentence-transformers==2.2.2
+
+# Install web framework dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 3: Production
+FROM base AS production
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Create non-root user for security
+RUN groupadd -r confit && useradd -r -g confit confit
+
+# Create necessary directories
+RUN mkdir -p /app/uploads /app/logs /app/models /app/.cache && \
+    chown -R confit:confit /app
+
+# Copy application code
+COPY --chown=confit:confit . .
+
+# Environment variables
+ENV PYTHONPATH=/app
+ENV CUDA_VISIBLE_DEVICES=0
+ENV TRANSFORMERS_CACHE=/app/.cache
+ENV HF_HOME=/app/.cache
+ENV TORCH_HOME=/app/.cache
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8000/api/ai/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Switch to non-root user
+USER confit
+
+# Run application with single worker for GPU
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

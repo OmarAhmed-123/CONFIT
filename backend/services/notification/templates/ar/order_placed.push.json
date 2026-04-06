@@ -1,0 +1,9 @@
+{
+  "title": "Order Placed",
+  "body": "Your order #{{ order_number }} has been placed successfully.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "order_placed"
+  }
+}

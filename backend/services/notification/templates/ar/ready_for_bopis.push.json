@@ -1,0 +1,12 @@
+{
+  "title": "Ready for Pickup",
+  "body": "Your order #{{ order_number }} is ready for pickup at {{ store_name }}.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "ready_for_bopis",
+    "store_name": "{{ store_name }}",
+    "store_address": "{{ store_address }}",
+    "pickup_window": "{{ pickup_window }}"
+  }
+}

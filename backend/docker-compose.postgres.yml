@@ -1,0 +1,89 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIT PostgreSQL Database Setup
+# Production-ready PostgreSQL with persistent storage
+# Usage: docker-compose -f docker-compose.postgres.yml up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: confit-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      # Database credentials - use strong password in production!
+      POSTGRES_USER: ${POSTGRES_USER:-confit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-confit_dev_password_2026!}
+      POSTGRES_DB: ${POSTGRES_DB:-confit}
+      # Data directory for PostgreSQL
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      # Persistent data volume
+      - postgres_data:/var/lib/postgresql/data
+      # Initialization scripts (runs on first start)
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - confit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-confit} -d ${POSTGRES_DB:-confit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Security: limit resources
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # Security: no new privileges
+    security_opt:
+      - no-new-privileges:true
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: confit-pgadmin
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@confit.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-confit_dev_password_2026!}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - confit-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - admin
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NETWORKS
+# ─────────────────────────────────────────────────────────────────────────────
+
+networks:
+  confit-network:
+    driver: bridge
+    name: confit-network
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+    driver: local
+    name: confit_postgres_data
+  pgadmin_data:
+    driver: local
+    name: confit_pgadmin_data

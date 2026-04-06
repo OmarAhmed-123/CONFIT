@@ -1,0 +1,1147 @@
+openapi: 3.1.0
+info:
+  title: CONFIT CARE API
+  description: |
+    API documentation for the CONFIT CARE donation system.
+    
+    ## Overview
+    CONFIT CARE enables donors to create charitable giving campaigns that provide
+    clothing shopping vouchers to beneficiaries. The system includes:
+    
+    - **Campaign Management**: Create, update, and manage donation campaigns
+    - **Beneficiary Management**: Add and manage beneficiaries with budget allocation
+    - **Voucher System**: Generate and validate shopping vouchers
+    - **Session Management**: Secure beneficiary access with OTP verification
+    - **Order Processing**: Track and manage care orders
+    - **Analytics & Reporting**: Campaign performance and impact metrics
+    
+    ## Authentication
+    Most endpoints require JWT authentication via the `Authorization: Bearer <token>` header.
+    Public endpoints (beneficiary access) use session tokens.
+    
+    ## Rate Limits
+    - Default: 60 requests/minute
+    - Auth endpoints: 10 requests/minute
+    - CARE endpoints: 30 requests/minute
+    - AI endpoints: 20 requests/minute
+    
+  version: 1.0.0
+  contact:
+    name: CONFIT Support
+    email: support@confit.app
+    url: https://confit.app/support
+  license:
+    name: Proprietary
+    url: https://confit.app/terms
+
+servers:
+  - url: https://api.confit.app
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+tags:
+  - name: Campaigns
+    description: Campaign management operations for donors
+  - name: Beneficiaries
+    description: Beneficiary management within campaigns
+  - name: Vouchers
+    description: Voucher creation and validation
+  - name: Sessions
+    description: Beneficiary session management
+  - name: Orders
+    description: Care order processing
+  - name: Analytics
+    description: Campaign analytics and reporting
+  - name: Audit
+    description: Audit log access
+
+paths:
+  # ============================================
+  # Campaign Endpoints
+  # ============================================
+  /api/care/campaigns:
+    get:
+      tags: [Campaigns]
+      summary: List donor's campaigns
+      description: Retrieve all campaigns for the authenticated donor with pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, paused, completed, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Campaign list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    post:
+      tags: [Campaigns]
+      summary: Create a new campaign
+      description: Create a donation campaign with specified budget and settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignCreate'
+      responses:
+        '201':
+          description: Campaign created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/care/campaigns/{campaign_id}:
+    get:
+      tags: [Campaigns]
+      summary: Get campaign details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      responses:
+        '200':
+          description: Campaign details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Campaigns]
+      summary: Update campaign
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignUpdate'
+      responses:
+        '200':
+          description: Campaign updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/care/campaigns/{campaign_id}/activate:
+    post:
+      tags: [Campaigns]
+      summary: Activate campaign with beneficiaries
+      description: Activate a draft campaign and add beneficiaries
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignActivate'
+      responses:
+        '200':
+          description: Campaign activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignResponse'
+        '400':
+          description: Cannot activate - invalid state or no beneficiaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/care/campaigns/{campaign_id}/summary:
+    get:
+      tags: [Campaigns]
+      summary: Get campaign summary statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      responses:
+        '200':
+          description: Campaign summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignSummary'
+
+  # ============================================
+  # Beneficiary Endpoints
+  # ============================================
+  /api/care/campaigns/{campaign_id}/beneficiaries:
+    get:
+      tags: [Beneficiaries]
+      summary: List campaign beneficiaries
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Beneficiary list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiaryListResponse'
+
+    post:
+      tags: [Beneficiaries]
+      summary: Add beneficiary to campaign
+      description: Add a single beneficiary with automatic voucher creation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiaryCreate'
+      responses:
+        '201':
+          description: Beneficiary added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiaryResponse'
+
+  /api/care/campaigns/{campaign_id}/beneficiaries/bulk:
+    post:
+      tags: [Beneficiaries]
+      summary: Bulk add beneficiaries
+      description: Add multiple beneficiaries at once (max 100)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiaryBulkUpload'
+      responses:
+        '200':
+          description: Bulk upload result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CSVUploadResponse'
+
+  # ============================================
+  # Voucher Endpoints
+  # ============================================
+  /api/care/vouchers/validate:
+    post:
+      tags: [Vouchers]
+      summary: Validate voucher token
+      description: Public endpoint for beneficiaries to validate their voucher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [voucher_token]
+              properties:
+                voucher_token:
+                  type: string
+                  description: Voucher token to validate
+      responses:
+        '200':
+          description: Voucher is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoucherResponse'
+        '400':
+          description: Invalid or expired voucher
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ============================================
+  # Session Endpoints (Public)
+  # ============================================
+  /api/care/session/initiate:
+    post:
+      tags: [Sessions]
+      summary: Initiate beneficiary session
+      description: Start a new shopping session using voucher token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionInitiate'
+      responses:
+        '200':
+          description: Session initiated, OTP required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: Invalid voucher or session creation failed
+
+  /api/care/session/{session_id}/otp/send:
+    post:
+      tags: [Sessions]
+      summary: Send OTP to beneficiary
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '429':
+          description: Too many OTP requests
+
+  /api/care/session/{session_id}/otp/verify:
+    post:
+      tags: [Sessions]
+      summary: Verify OTP code
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OTPVerify'
+      responses:
+        '200':
+          description: OTP verified, session authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: Invalid OTP
+
+  /api/care/session/{session_token}/context:
+    get:
+      tags: [Sessions]
+      summary: Get session context
+      description: Get full shopping context for authenticated session
+      parameters:
+        - name: session_token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session context
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiarySessionContext'
+        '401':
+          description: Invalid or expired session
+
+  # ============================================
+  # Order Endpoints
+  # ============================================
+  /api/care/orders:
+    post:
+      tags: [Orders]
+      summary: Create care order
+      description: Place an order from an authenticated session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareOrderCreate'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareOrderConfirmation'
+        '400':
+          description: Budget exceeded or invalid items
+
+  /api/care/orders/{order_id}:
+    get:
+      tags: [Orders]
+      summary: Get order details
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareOrderResponse'
+
+  # ============================================
+  # Dashboard & Analytics
+  # ============================================
+  /api/care/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Get donor dashboard
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DonorDashboardResponse'
+
+  /api/care/campaigns/{campaign_id}/analytics:
+    get:
+      tags: [Analytics]
+      summary: Get campaign analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      responses:
+        '200':
+          description: Campaign analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareAnalyticsResponse'
+
+  /api/care/campaigns/{campaign_id}/report:
+    post:
+      tags: [Analytics]
+      summary: Generate campaign report
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareReportRequest'
+      responses:
+        '200':
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CareReportResponse'
+
+  # ============================================
+  # Audit Log
+  # ============================================
+  /api/care/campaigns/{campaign_id}/audit-log:
+    get:
+      tags: [Audit]
+      summary: Get campaign audit log
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/campaign_id'
+        - name: action_category
+          in: query
+          schema:
+            type: string
+            enum: [campaign, beneficiary, voucher, session, order]
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+
+components:
+  # --------------------------------------------
+  # Security Schemes
+  # --------------------------------------------
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from authentication
+
+  # --------------------------------------------
+  # Parameters
+  # --------------------------------------------
+  parameters:
+    campaign_id:
+      name: campaign_id
+      in: path
+      required: true
+      description: Unique campaign identifier
+      schema:
+        type: string
+        format: uuid
+
+  # --------------------------------------------
+  # Responses
+  # --------------------------------------------
+  responses:
+    BadRequest:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # --------------------------------------------
+  # Schemas
+  # --------------------------------------------
+  schemas:
+    # Base Types
+    Error:
+      type: object
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+
+    # Campaign Schemas
+    CampaignCreate:
+      type: object
+      required:
+        - campaign_name
+        - campaign_type
+        - budget_per_person
+        - currency
+        - voucher_expiry_days
+      properties:
+        campaign_name:
+          type: string
+          maxLength: 100
+        campaign_type:
+          type: string
+          enum: [individual, organization, seasonal, corporate, emergency]
+        description:
+          type: string
+          maxLength: 500
+        budget_per_person:
+          type: number
+          minimum: 500
+          maximum: 5000
+        currency:
+          type: string
+          default: EGP
+        allowed_categories:
+          type: array
+          items:
+            type: string
+        excluded_brands:
+          type: array
+          items:
+            type: string
+        occasion_filter:
+          type: string
+        end_date:
+          type: string
+          format: date-time
+        voucher_expiry_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 30
+        invitation_message:
+          type: string
+        confirmation_message:
+          type: string
+
+    CampaignUpdate:
+      type: object
+      properties:
+        campaign_name:
+          type: string
+        description:
+          type: string
+        end_date:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, paused, cancelled]
+
+    CampaignActivate:
+      type: object
+      required:
+        - beneficiaries
+      properties:
+        beneficiaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/BeneficiaryCreate'
+          maxItems: 100
+        send_invitations:
+          type: boolean
+          default: true
+
+    CampaignResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaign_name:
+          type: string
+        campaign_type:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, paused, completed, cancelled]
+        description:
+          type: string
+        total_beneficiaries:
+          type: integer
+        total_budget_allocated:
+          type: number
+        total_budget_used:
+          type: number
+        currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+
+    CampaignListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            campaigns:
+              type: array
+              items:
+                $ref: '#/components/schemas/CampaignResponse'
+
+    CampaignSummary:
+      type: object
+      properties:
+        total_beneficiaries:
+          type: integer
+        active_vouchers:
+          type: integer
+        total_budget_allocated:
+          type: number
+        total_budget_used:
+          type: number
+        engagement_rate:
+          type: number
+        completion_rate:
+          type: number
+        spending_by_category:
+          type: object
+          additionalProperties:
+            type: number
+
+    # Beneficiary Schemas
+    BeneficiaryCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        age_group:
+          type: string
+          enum: ['18-25', '26-35', '36-45', '46-55', '55+']
+        size_preference:
+          type: string
+        style_preference:
+          type: array
+          items:
+            type: string
+        occasion_needs:
+          type: array
+          items:
+            type: string
+
+    BeneficiaryResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaign_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        budget_allocated:
+          type: number
+        budget_used:
+          type: number
+        budget_remaining:
+          type: number
+        status:
+          type: string
+          enum: [pending, invited, active, completed]
+        voucher:
+          $ref: '#/components/schemas/VoucherResponse'
+
+    BeneficiaryListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            beneficiaries:
+              type: array
+              items:
+                $ref: '#/components/schemas/BeneficiaryResponse'
+
+    BeneficiaryBulkUpload:
+      type: object
+      required:
+        - beneficiaries
+      properties:
+        beneficiaries:
+          type: array
+          items:
+            $ref: '#/components/schemas/BeneficiaryCreate'
+          maxItems: 100
+
+    CSVUploadResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        succeeded:
+          type: integer
+        failed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row:
+                type: integer
+              error:
+                type: string
+
+    # Voucher Schemas
+    VoucherResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        voucher_token:
+          type: string
+        campaign_id:
+          type: string
+          format: uuid
+        beneficiary_id:
+          type: string
+          format: uuid
+        budget_allocated:
+          type: number
+        budget_used:
+          type: number
+        budget_remaining:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, used, expired, cancelled]
+        expires_at:
+          type: string
+          format: date-time
+
+    # Session Schemas
+    SessionInitiate:
+      type: object
+      required:
+        - voucher_token
+      properties:
+        voucher_token:
+          type: string
+
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_token:
+          type: string
+        status:
+          type: string
+          enum: [pending, authenticated, expired, completed]
+        otp_verified:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+
+    OTPVerify:
+      type: object
+      required:
+        - otp_code
+      properties:
+        otp_code:
+          type: string
+          pattern: '^\d{6}$'
+
+    BeneficiarySessionContext:
+      type: object
+      properties:
+        session:
+          $ref: '#/components/schemas/SessionResponse'
+        voucher:
+          $ref: '#/components/schemas/VoucherResponse'
+        beneficiary:
+          $ref: '#/components/schemas/BeneficiaryResponse'
+        campaign:
+          $ref: '#/components/schemas/CampaignResponse'
+        budget_remaining:
+          type: number
+        allowed_categories:
+          type: array
+          items:
+            type: string
+        excluded_brands:
+          type: array
+          items:
+            type: string
+        occasion_filter:
+          type: string
+
+    # Order Schemas
+    CareOrderCreate:
+      type: object
+      required:
+        - session_id
+        - items
+      properties:
+        session_id:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: string
+              quantity:
+                type: integer
+              size:
+                type: string
+              color:
+                type: string
+              price:
+                type: number
+        delivery_method:
+          type: string
+          enum: [shipping, pickup]
+        shipping_address:
+          type: object
+          properties:
+            address_line1:
+              type: string
+            address_line2:
+              type: string
+            city:
+              type: string
+            postal_code:
+              type: string
+            phone:
+              type: string
+
+    CareOrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+        voucher_id:
+          type: string
+        beneficiary_id:
+          type: string
+        total_amount:
+          type: number
+        items_count:
+          type: integer
+        status:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+        created_at:
+          type: string
+          format: date-time
+
+    CareOrderConfirmation:
+      type: object
+      properties:
+        order:
+          $ref: '#/components/schemas/CareOrderResponse'
+        message:
+          type: string
+        budget_remaining:
+          type: number
+        estimated_delivery:
+          type: string
+
+    # Analytics Schemas
+    DonorDashboardResponse:
+      type: object
+      properties:
+        total_campaigns:
+          type: integer
+        active_campaigns:
+          type: integer
+        total_beneficiaries_supported:
+          type: integer
+        total_donated:
+          type: number
+        total_impact_value:
+          type: number
+        currency:
+          type: string
+        recent_campaigns:
+          type: array
+          items:
+            $ref: '#/components/schemas/CampaignResponse'
+        recent_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/CareOrderResponse'
+        spending_by_category:
+          type: object
+          additionalProperties:
+            type: number
+
+    CareAnalyticsResponse:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+        total_views:
+          type: integer
+        total_sessions:
+          type: integer
+        total_orders:
+          type: integer
+        total_items_purchased:
+          type: integer
+        average_order_value:
+          type: number
+        engagement_rate:
+          type: number
+        completion_rate:
+          type: number
+        spending_by_category:
+          type: object
+          additionalProperties:
+            type: number
+        spending_by_brand:
+          type: object
+          additionalProperties:
+            type: number
+        daily_stats:
+          type: array
+          items:
+            type: object
+
+    CareReportRequest:
+      type: object
+      properties:
+        report_type:
+          type: string
+          enum: [summary, detailed, financial, impact]
+        format:
+          type: string
+          enum: [pdf, csv, json]
+          default: pdf
+
+    CareReportResponse:
+      type: object
+      properties:
+        report_id:
+          type: string
+        download_url:
+          type: string
+        format:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+
+    # Audit Log Schemas
+    AuditLogListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            logs:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLogResponse'
+
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaign_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        action_category:
+          type: string
+          enum: [campaign, beneficiary, voucher, session, order]
+        actor_type:
+          type: string
+          enum: [donor, beneficiary, admin, system]
+        actor_id:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        details:
+          type: object
+        ip_address:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

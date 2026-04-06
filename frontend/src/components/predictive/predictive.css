@@ -1,0 +1,222 @@
+/**
+ * CONFIT — Predictive Insights Styles
+ * =====================================
+ * CSS styles for predictive analytics components using CONFIT's
+ * luxury gold/purple aesthetic.
+ */
+
+/* ─── Color Variables ─────────────────────────────────────────────────── */
+
+:root {
+  --confit-gold: #D4AF37;
+  --confit-gold-light: rgba(212, 175, 55, 0.15);
+  --confit-gold-glow: rgba(212, 175, 55, 0.35);
+  --confit-purple: #8B5CF6;
+  --confit-purple-light: rgba(139, 92, 246, 0.15);
+  --confit-purple-glow: rgba(139, 92, 246, 0.35);
+  --confit-emerald: #10B981;
+  --confit-emerald-light: rgba(16, 185, 129, 0.15);
+  --confit-emerald-glow: rgba(16, 185, 129, 0.35);
+}
+
+/* ─── Severity Backgrounds ─────────────────────────────────────────────── */
+
+.severity-bg-critical {
+  background-color: var(--confit-gold-light);
+}
+
+.severity-bg-warning {
+  background-color: var(--confit-purple-light);
+}
+
+.severity-bg-opportunity {
+  background-color: var(--confit-emerald-light);
+}
+
+/* ─── Severity Text Colors ─────────────────────────────────────────────── */
+
+.severity-text-critical {
+  color: var(--confit-gold);
+}
+
+.severity-text-warning {
+  color: var(--confit-purple);
+}
+
+.severity-text-opportunity {
+  color: var(--confit-emerald);
+}
+
+/* ─── Severity Border Colors ───────────────────────────────────────────── */
+
+.severity-border-critical {
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+.severity-border-warning {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.severity-border-opportunity {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+/* ─── Severity Glow Shadows ────────────────────────────────────────────── */
+
+.severity-glow-critical {
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+}
+
+.severity-glow-warning {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+}
+
+.severity-glow-opportunity {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+}
+
+/* ─── Severity Dots ────────────────────────────────────────────────────── */
+
+.severity-dot-critical {
+  background-color: var(--confit-gold);
+}
+
+.severity-dot-warning {
+  background-color: var(--confit-purple);
+}
+
+.severity-dot-opportunity {
+  background-color: var(--confit-emerald);
+}
+
+/* ─── Gradient Backgrounds ─────────────────────────────────────────────── */
+
+.gradient-gold-purple {
+  background: linear-gradient(135deg, var(--confit-gold), var(--confit-purple));
+}
+
+.gradient-purple-blue {
+  background: linear-gradient(to right, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+}
+
+/* ─── Trend Indicator Backgrounds ───────────────────────────────────────── */
+
+.trend-bg-up {
+  background-color: rgba(16, 185, 129, 0.2);
+}
+
+.trend-bg-down {
+  background-color: rgba(212, 175, 55, 0.2);
+}
+
+.trend-bg-stable {
+  background-color: rgba(139, 92, 246, 0.2);
+}
+
+/* ─── Forecast Chart Bar Colors ────────────────────────────────────────── */
+
+.forecast-bar-up {
+  background-color: var(--confit-emerald);
+}
+
+.forecast-bar-down {
+  background-color: var(--confit-gold);
+}
+
+.forecast-bar-stable {
+  background-color: var(--confit-purple);
+}
+
+/* ─── Animated Pulse for Critical Alerts ───────────────────────────────── */
+
+@keyframes confit-pulse-gold {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-gold {
+  animation: confit-pulse-gold 2s ease-in-out infinite;
+}
+
+/* ─── Spinning Loader ──────────────────────────────────────────────────── */
+
+.loader-spin {
+  animation: confit-spin 1s linear infinite;
+}
+
+@keyframes confit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── Predictive Panel Styles ──────────────────────────────────────────── */
+
+.predictive-panel-gradient {
+  background: linear-gradient(to right, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.predictive-badge-gradient {
+  background: linear-gradient(to right, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.predictive-badge-gradient:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+/* ─── Insight Header Styles ────────────────────────────────────────────── */
+
+.insight-header-gradient {
+  background: linear-gradient(to right, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+/* ─── Filter Change Indicator Styles ───────────────────────────────────── */
+
+.filter-indicator-add {
+  background-color: rgba(34, 197, 94, 0.125);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.filter-indicator-remove {
+  background-color: rgba(245, 158, 11, 0.125);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.filter-indicator-clear {
+  background-color: rgba(139, 92, 246, 0.125);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.filter-dot-add {
+  background-color: #22c55e;
+}
+
+.filter-dot-remove {
+  background-color: #f59e0b;
+}
+
+.filter-dot-clear {
+  background-color: #8B5CF6;
+}
+
+.filter-text-add {
+  color: #22c55e;
+}
+
+.filter-text-remove {
+  color: #f59e0b;
+}
+
+.filter-text-clear {
+  color: #8B5CF6;
+}

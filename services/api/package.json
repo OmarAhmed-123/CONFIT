@@ -1,0 +1,41 @@
+{
+  "name": "@confit/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@confit/contracts": "file:../../packages/contracts",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.2.0",
+    "argon2": "^0.44.0",
+    "bullmq": "^5.58.0",
+    "confit": "file:../..",
+    "dotenv": "^16.6.1",
+    "fastify": "^5.6.0",
+    "ioredis": "^5.7.0",
+    "jose": "^6.1.0",
+    "nanoid": "^5.1.5",
+    "pino": "^9.9.0",
+    "stripe": "^21.0.0",
+    "undici": "^7.16.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.16.5",
+    "eslint": "^9.32.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

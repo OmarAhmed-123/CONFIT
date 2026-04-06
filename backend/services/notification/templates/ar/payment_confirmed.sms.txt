@@ -1,0 +1,1 @@
+CONFIT: Payment confirmed for order #{{ order_number }}. We're preparing your items.

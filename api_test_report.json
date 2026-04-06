@@ -1,0 +1,535 @@
+{
+  "summary": {
+    "total_tests": 55,
+    "successful_tests": 52,
+    "success_rate": 94.54545454545455,
+    "avg_response_time": 68.75942307692308,
+    "failed_tests": [
+      {
+        "timestamp": "2026-02-27T20:22:26.474991",
+        "endpoint": "/api/virtual-tryon/process",
+        "method": "POST",
+        "status_code": 422,
+        "response_time_ms": 28.85,
+        "success": false,
+        "error": "Expected 200, got 422"
+      },
+      {
+        "timestamp": "2026-02-27T20:22:26.569153",
+        "endpoint": "/api/omni/store-route?store_id=7501b561-ccb9-4216-befb-25072b19d9ed&product_ids=b887db5c-b563-4720-b17f-f5db91948d73,6f09eac9-ade5-4a47-84f7-10320ae1ab4e",
+        "method": "GET",
+        "status_code": 401,
+        "response_time_ms": 28.0,
+        "success": false,
+        "error": "Expected 200, got 401"
+      },
+      {
+        "timestamp": "2026-02-27T20:22:26.578920",
+        "endpoint": "/api/omni/store-route?store_id=invalid&product_ids=test",
+        "method": "GET",
+        "status_code": 401,
+        "response_time_ms": 9.05,
+        "success": false,
+        "error": "Expected 400, got 401"
+      }
+    ],
+    "slow_tests": []
+  },
+  "detailed_results": [
+    {
+      "timestamp": "2026-02-27T20:22:26.338190",
+      "endpoint": "/",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 319.52,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.342358",
+      "endpoint": "/docs",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 3.31,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.402808",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 60.14,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.415298",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 11.54,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.426986",
+      "endpoint": "/api/products/featured?limit=12&gender=men",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 11.3,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.436287",
+      "endpoint": "/api/products/featured?limit=12&gender=women",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 8.86,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.445290",
+      "endpoint": "/api/products/872e99ad-c894-4d90-b7d5-cf99c91b923b",
+      "method": "GET",
+      "status_code": 404,
+      "response_time_ms": 8.68,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.474991",
+      "endpoint": "/api/virtual-tryon/process",
+      "method": "POST",
+      "status_code": 422,
+      "response_time_ms": 28.85,
+      "success": false,
+      "error": "Expected 200, got 422"
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.518653",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 42.81,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.522898",
+      "endpoint": "/api/challenges/quests/invalid-uuid",
+      "method": "GET",
+      "status_code": 400,
+      "response_time_ms": 3.83,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.530067",
+      "endpoint": "/api/challenges/quests/20a36b3d-4b66-46dd-b0eb-b7f413567be6",
+      "method": "GET",
+      "status_code": 404,
+      "response_time_ms": 6.81,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.539879",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 8.12,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.569153",
+      "endpoint": "/api/omni/store-route?store_id=7501b561-ccb9-4216-befb-25072b19d9ed&product_ids=b887db5c-b563-4720-b17f-f5db91948d73,6f09eac9-ade5-4a47-84f7-10320ae1ab4e",
+      "method": "GET",
+      "status_code": 401,
+      "response_time_ms": 28.0,
+      "success": false,
+      "error": "Expected 200, got 401"
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.578920",
+      "endpoint": "/api/omni/store-route?store_id=invalid&product_ids=test",
+      "method": "GET",
+      "status_code": 401,
+      "response_time_ms": 9.05,
+      "success": false,
+      "error": "Expected 400, got 401"
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.604009",
+      "endpoint": "/api/wardrobe/items",
+      "method": "GET",
+      "status_code": 401,
+      "response_time_ms": 23.35,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.639160",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 30.59,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.688266",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 78.47,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.688788",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 79.54,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.689027",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 74.07,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.689389",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 75.91,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.691661",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 79.05,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.874242",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 266.42,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.901426",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 287.82,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.901808",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 289.35,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.903347",
+      "endpoint": "/api/products",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 290.82,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.991639",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 74.84,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.993213",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 76.44,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.993550",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 75.47,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.994536",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 77.11,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.995073",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 78.77,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.995594",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 80.84,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.996066",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 81.68,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.996527",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 83.97,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.996735",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 84.61,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:26.997035",
+      "endpoint": "/api/products/featured?limit=12",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 85.93,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.042713",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 30.92,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.044340",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 32.66,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.045241",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 33.91,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.045548",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 34.21,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.045960",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 34.58,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.049612",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 36.35,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.050562",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 37.77,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.051368",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 38.25,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.051659",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 40.08,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.051959",
+      "endpoint": "/api/challenges/quests",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 40.41,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.079729",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 25.39,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.091776",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 32.31,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.092135",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 33.42,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.092569",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 34.11,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.093287",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 35.34,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.093578",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 35.65,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.093951",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 36.52,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.099376",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 39.31,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.099705",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 41.05,
+      "success": true,
+      "error": null
+    },
+    {
+      "timestamp": "2026-02-27T20:22:27.100040",
+      "endpoint": "/api/challenges/leaderboard",
+      "method": "GET",
+      "status_code": 200,
+      "response_time_ms": 43.28,
+      "success": true,
+      "error": null
+    }
+  ]
+}

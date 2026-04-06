@@ -1,0 +1,10 @@
+{
+  "title": "Coupon Redeemed",
+  "body": "Your coupon has been applied to order #{{ order_number }}.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "coupon_redeemed",
+    "discount": "{{ discount }}"
+  }
+}

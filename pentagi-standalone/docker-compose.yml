@@ -1,0 +1,66 @@
+services:
+  pentagi:
+    image: vxcontrol/pentagi:latest
+    container_name: pentagi-server
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    env_file:
+      - pentagi.env
+    volumes:
+      - pentagi_data:/app/data
+      - pentagi_reports:/app/reports
+      - pentagi_ssl:/app/ssl
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+    networks:
+      - pentagi-network
+
+  pentagi-worker:
+    image: vxcontrol/pentagi:latest
+    container_name: pentagi-worker
+    restart: unless-stopped
+    command: ["python", "-m", "pentagi.worker"]
+    env_file:
+      - pentagi.env
+    volumes:
+      - pentagi_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      pentagi-pgvector:
+        condition: service_healthy
+      pentagi:
+        condition: service_started
+    networks:
+      - pentagi-network
+
+  pentagi-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: pentagi-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pentagi
+      POSTGRES_PASSWORD: your-secure-password-here
+      POSTGRES_DB: pentagidb
+    volumes:
+      - pentagi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pentagi -d pentagidb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - pentagi-network
+
+volumes:
+  pentagi_data:
+  pentagi_reports:
+  pentagi_ssl:
+  pentagi_pgdata:
+
+networks:
+  pentagi-network:
+    driver: bridge

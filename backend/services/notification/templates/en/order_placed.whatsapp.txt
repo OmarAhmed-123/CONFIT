@@ -1,0 +1,8 @@
+*Order Placed* 
+
+Your order #{{ order_number }} has been placed successfully.
+
+Product: {{ product_name }}
+Qty: {{ quantity }}
+
+Track your order: {{ action_url }}

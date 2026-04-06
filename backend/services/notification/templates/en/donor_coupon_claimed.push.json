@@ -1,0 +1,9 @@
+{
+  "title": "Donation Impact",
+  "body": "Your donated item has been claimed! Thank you for your generosity.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "trigger": "donor_coupon_claimed",
+    "store_name": "{{ store_name }}"
+  }
+}

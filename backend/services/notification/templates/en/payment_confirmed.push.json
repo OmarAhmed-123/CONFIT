@@ -1,0 +1,9 @@
+{
+  "title": "Payment Confirmed",
+  "body": "Payment for order #{{ order_number }} confirmed. We'll start preparing your items.",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "payment_confirmed"
+  }
+}

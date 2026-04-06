@@ -1,0 +1,427 @@
+# CONFIT CARE - CI/CD Pipeline
+# ==============================
+# GitHub Actions workflow for automated testing and deployment
+
+name: CONFIT CARE CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/care-deploy.yml'
+  
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # ==========================================
+  # Backend Tests
+  # ==========================================
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: confit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run linting
+        working-directory: ./backend
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run type checking
+        working-directory: ./backend
+        run: mypy --ignore-missing-imports .
+
+      - name: Run tests with coverage
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/confit_test
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: test-secret-key
+          ENVIRONMENT: test
+        run: |
+          pytest --cov=. --cov-report=xml --cov-report=html --junitxml=junit.xml -v
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: backend-test-results
+          path: |
+            backend/junit.xml
+            backend/htmlcov/
+
+  # ==========================================
+  # Frontend Tests
+  # ==========================================
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run linting
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Run type checking
+        working-directory: ./frontend
+        run: npm run type-check
+
+      - name: Run tests
+        working-directory: ./frontend
+        run: npm run test:coverage
+
+      - name: Build application
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: frontend/dist/
+
+  # ==========================================
+  # Security Scan
+  # ==========================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (Backend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './backend'
+          format: 'sarif'
+          output: 'trivy-backend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy vulnerability scanner (Frontend)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './frontend'
+          format: 'sarif'
+          output: 'trivy-frontend.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-*.sarif'
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --severity-threshold=high
+
+  # ==========================================
+  # Build Docker Images
+  # ==========================================
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      backend-tag: ${{ steps.meta-backend.outputs.tags }}
+      frontend-tag: ${{ steps.meta-frontend.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata for Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================
+  # Deploy to Staging
+  # ==========================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images, security-scan]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.confit.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name confit-staging --region us-east-1
+
+      - name: Deploy to staging
+        run: |
+          kubectl set image deployment/confit-backend \
+            backend=${{ needs.build-images.outputs.backend-tag }} \
+            -n confit-staging
+          kubectl set image deployment/confit-frontend \
+            frontend=${{ needs.build-images.outputs.frontend-tag }} \
+            -n confit-staging
+          kubectl rollout status deployment/confit-backend -n confit-staging
+          kubectl rollout status deployment/confit-frontend -n confit-staging
+
+      - name: Run smoke tests
+        run: |
+          curl -f https://staging.confit.app/health || exit 1
+          curl -f https://staging.confit.app/api/health || exit 1
+
+  # ==========================================
+  # Deploy to Production
+  # ==========================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://confit.app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name confit-production --region us-east-1
+
+      - name: Create production deployment ticket
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Production Deployment - ${context.sha}`,
+              body: `
+                ## Deployment Details
+                - **Commit**: ${context.sha}
+                - **Branch**: ${context.ref}
+                - **Actor**: ${context.actor}
+                - **Backend Image**: ${{ needs.build-images.outputs.backend-tag }}
+                - **Frontend Image**: ${{ needs.build-images.outputs.frontend-tag }}
+                
+                ## Checklist
+                - [ ] All tests passed
+                - [ ] Security scan completed
+                - [ ] Staging deployment successful
+                - [ ] Manual QA approved
+              `,
+              labels: ['deployment', 'production']
+            })
+
+      - name: Deploy to production (blue-green)
+        run: |
+          # Deploy to green environment
+          kubectl apply -f k8s/production-green.yaml -n confit-production
+          
+          # Wait for green to be ready
+          kubectl wait --for=condition=available --timeout=300s \
+            deployment/confit-backend-green -n confit-production
+          kubectl wait --for=condition=available --timeout=300s \
+            deployment/confit-frontend-green -n confit-production
+          
+          # Switch traffic to green
+          kubectl patch service confit-backend \
+            -p '{"spec":{"selector":{"version":"green"}}}' \
+            -n confit-production
+          kubectl patch service confit-frontend \
+            -p '{"spec":{"selector":{"version":"green"}}}' \
+            -n confit-production
+          
+          # Scale down blue
+          kubectl scale deployment confit-backend-blue --replicas=0 -n confit-production
+          kubectl scale deployment confit-frontend-blue --replicas=0 -n confit-production
+
+      - name: Verify production deployment
+        run: |
+          curl -f https://confit.app/health || exit 1
+          curl -f https://confit.app/api/health || exit 1
+
+      - name: Notify deployment status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,28 @@
+/**
+ * CONFIT MCP gateway — Durable Object hosts MCP session.
+ * Set CONFIT_API_BASE_URL in dashboard or .dev.vars (e.g. http://localhost:8000).
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "confit-mcp-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "migrations": [
+    {
+      "new_sqlite_classes": ["ConfitMCP"],
+      "tag": "v1"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "ConfitMCP",
+        "name": "MCP_OBJECT"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  }
+}

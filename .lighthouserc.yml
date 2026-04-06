@@ -1,0 +1,97 @@
+ci:
+  collect:
+    numberOfRuns: 3
+    settings:
+      maxWaitForLoad: 45000
+      throttling:
+        rttMs: 40
+        throughputKbps: 10240
+        cpuSlowdownMultiplier: 1
+      onlyCategories:
+        - performance
+        - accessibility
+        - best-practices
+        - seo
+      staticDistDir: ./dist
+    url:
+      - http://localhost:8080/
+      - http://localhost:8080/discover
+      - http://localhost:8080/brands
+      - http://localhost:8080/stylist
+      - http://localhost:8080/try-on
+      - http://localhost:8080/outfits
+      - http://localhost:8080/wardrobe
+
+  assert:
+    assertions:
+      categories:performance:
+        minScore: 0.95
+      categories:accessibility:
+        minScore: 0.95
+      categories:seo:
+        minScore: 0.95
+      categories:best-practices:
+        minScore: 0.95
+      metrics:first-contentful-paint:
+        maxNumericValue: 1500
+      metrics:largest-contentful-paint:
+        maxNumericValue: 2500
+      metrics:cumulative-layout-shift:
+        maxNumericValue: 0.1
+      metrics:total-blocking-time:
+        maxNumericValue: 200
+      metrics:speed-index:
+        maxNumericValue: 3000
+      unused-javascript:
+        maxNumericValue: 20000
+      unused-css-rules:
+        maxNumericValue: 5000
+      unminified-javascript:
+        maxNumericValue: 0
+      unminified-css:
+        maxNumericValue: 0
+      modern-image-formats:
+        minScore: 0.9
+      uses-text-compression:
+        minScore: 1
+      uses-responsive-images:
+        minScore: 0.9
+      efficient-animated-content:
+        minScore: 1
+      color-contrast:
+        minScore: 1
+      document-title:
+        minScore: 1
+      meta-description:
+        minScore: 1
+      html-has-lang:
+        minScore: 1
+      image-alt:
+        minScore: 1
+      label:
+        minScore: 1
+      link-name:
+        minScore: 1
+      aria-allowed-attr:
+        minScore: 1
+      aria-hidden-body:
+        minScore: 1
+      aria-hidden-focus:
+        minScore: 1
+      aria-required-attr:
+        minScore: 1
+      aria-required-children:
+        minScore: 1
+      aria-valid-attr:
+        minScore: 1
+      aria-valid-attr-value:
+        minScore: 1
+      meta-viewport:
+        minScore: 1
+      link-text:
+        minScore: 0.95
+      http-status-code:
+        minScore: 1
+
+  upload:
+    target: temporary-public-storage

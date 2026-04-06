@@ -1,0 +1,1 @@
+CONFIT: Issue with order #{{ order_number }}. {{ rejection_reason }}. Contact support.

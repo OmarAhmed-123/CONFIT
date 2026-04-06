@@ -1,0 +1,9 @@
+# Ollama provider configuration (optional, for local LLM inference)
+# Uncomment if using Ollama alongside DeepSeek
+
+# provider:
+#   name: "ollama"
+#   base_url: "http://ollama-server:11434"
+#   models:
+#     - name: "llama3.1:8b"
+#       max_tokens: 4096

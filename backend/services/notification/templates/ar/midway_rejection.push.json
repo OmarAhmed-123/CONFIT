@@ -1,0 +1,10 @@
+{
+  "title": "Order Update",
+  "body": "There's an issue with your order #{{ order_number }}. Reason: {{ rejection_reason }}",
+  "data": {
+    "order_number": "{{ order_number }}",
+    "order_id": "{{ order_id }}",
+    "trigger": "midway_rejection",
+    "rejection_reason": "{{ rejection_reason }}"
+  }
+}
