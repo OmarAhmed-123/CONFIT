@@ -1,0 +1,15 @@
+{
+  "feature_window_days": 90,
+  "min_events_per_recipient": 5,
+  "n_personas": 5,
+  "min_personas": 3,
+  "max_personas": 8,
+  "auto_select_k": true,
+  "model_type": "decision_tree",
+  "validation_days": 7,
+  "accuracy_window_days": 30,
+  "drift_performance_threshold": 0.1,
+  "drift_data_threshold": 0.15,
+  "drift_check_interval_days": 7,
+  "model_directory": "models/notification_ml"
+}

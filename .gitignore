@@ -78,6 +78,7 @@ coverage.xml
 *.pkl
 *.joblib
 models/
+!backend/models/
 checkpoints/
 
 # Database
