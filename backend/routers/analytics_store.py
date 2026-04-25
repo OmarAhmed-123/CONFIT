@@ -99,17 +99,22 @@ def _check_store_access(user: UserProfile, store: Store, db: Session) -> None:
     user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
     if user_role and user_role.role == AppRole.admin:
         return
-    
+
     # Store manager must be associated with the store's brand
     if user_role and user_role.role == AppRole.brand_manager:
-        # Check if user is manager for this store's brand
-        # In a real system, there would be a brand_manager assignment table
-        # For now, we allow brand_manager access if they manage the brand
-        pass
-    
+        # Check if user is manager for this store's brand via BrandManager model
+        from models.production_models import BrandManager
+        is_manager = db.query(BrandManager).filter(
+            BrandManager.user_id == user.id,
+            BrandManager.brand_id == store.brand_id,
+            BrandManager.is_active == True
+        ).first()
+        if is_manager:
+            return
+        raise HTTPException(status_code=403, detail="Not authorized for this store's brand")
+
     # If no valid role, deny access
-    if not user_role or user_role.role not in (AppRole.admin, AppRole.brand_manager):
-        raise HTTPException(status_code=403, detail="Access denied")
+    raise HTTPException(status_code=403, detail="Access denied - store_manager or admin required")
 
 
 def _parse_return_reason(reason: str) -> str:

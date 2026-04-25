@@ -4,13 +4,15 @@ CONFIT Backend — Analytics & Insights Router
 Read-only analytics endpoints aggregating data from the in-memory
 catalog and order system to support brand dashboards and internal
 reporting.
+
+Auth: admin or brand_manager required for all endpoints.
 """
 
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import func
 
 from controllers.product_controller import ProductController
@@ -20,20 +22,31 @@ from utils.auth_deps import require_auth
 from database.session import get_db
 from sqlalchemy.orm import Session
 from models.profile_models import UserBehaviorSignal
+from database.models import UserRole, AppRole
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 _product_controller = ProductController()
 
 
+def _require_admin_or_manager(user: UserProfile, db: Session) -> None:
+    """Ensure user is admin or brand_manager."""
+    user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
+    if not user_role or user_role.role not in (AppRole.admin, AppRole.brand_manager):
+        raise HTTPException(status_code=403, detail="Admin or brand_manager access required")
+
+
 @router.get("/overview")
-async def analytics_overview(user: UserProfile = Depends(require_auth)):
+async def analytics_overview(
+    user: UserProfile = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
     """
     High-level analytics summarising product performance and return behaviour.
 
-    This endpoint is restricted to authenticated users and is intended to
-    back-brand dashboards and internal tools rather than public UI.
+    This endpoint is restricted to admin or brand_manager users.
     """
+    _require_admin_or_manager(user, db)
     order_service = get_order_service()
 
     # Aggregate orders and returns
@@ -122,7 +135,10 @@ async def analytics_metrics(
     - DAU/MAU computed from distinct users active in the window.
     - Retention (D7): overlap between users active in days [-14,-7) and [-7,0).
     - Conversion: purchases per try-on (fallback to purchases per stylist chat).
+
+    Auth: admin or brand_manager required.
     """
+    _require_admin_or_manager(user, db)
     days = 7 if range == "7d" else 30 if range == "30d" else 90
     now = datetime.now(timezone.utc)
 
