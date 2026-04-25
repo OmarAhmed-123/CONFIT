@@ -200,19 +200,54 @@ async def payment_public_config():
     paymob_key = os.getenv("PAYMOB_API_KEY", "").strip()
     paymob_iid = os.getenv("PAYMOB_INTEGRATION_ID", "").strip()
     paymob_enabled = bool(paymob_key and paymob_iid)
-    paymob_iframe_ready = paymob_enabled and bool(os.getenv("PAYMOB_IFRAME_ID", "").strip())
+    paymob_iframe_id = os.getenv("PAYMOB_IFRAME_ID", "").strip()
+    paymob_iframe_ready = paymob_enabled and bool(paymob_iframe_id)
+
+    # Build Paymob iframe URL if configured
+    paymob_iframe_url = None
+    if paymob_iframe_ready:
+        paymob_iframe_url = f"https://accept.paymob.com/api/acceptance/iframes/{paymob_iframe_id}?payment_token={{payment_key}}"
+
+    # Get integration IDs for different payment methods
+    paymob_integration_ids = {
+        "card": os.getenv("PAYMOB_INTEGRATION_ID_CARD", paymob_iid) or None,
+        "card_3ds": os.getenv("PAYMOB_INTEGRATION_ID_CARD_3DS", paymob_iid) or None,
+        "meeza": os.getenv("PAYMOB_INTEGRATION_ID_MEEZA", "").strip() or None,
+        "instapay": os.getenv("PAYMOB_INTEGRATION_ID_INSTAPAY", "").strip() or None,
+        "valu": os.getenv("PAYMOB_INTEGRATION_ID_VALU", "").strip() or None,
+    }
 
     paypal_cid = os.getenv("PAYPAL_CLIENT_ID", "").strip()
     paypal_sec = os.getenv("PAYPAL_CLIENT_SECRET", "").strip()
     paypal_enabled = bool(paypal_cid and paypal_sec)
+
+    # Fawry configuration
+    fawry_merchant_code = os.getenv("FAWRY_MERCHANT_CODE", "").strip()
+    fawry_enabled = bool(fawry_merchant_code and os.getenv("FAWRY_SECURITY_KEY", "").strip())
+
+    # Default currency based on region
+    default_currency = os.getenv("DEFAULT_CURRENCY", "EGP" if paymob_enabled else "USD")
+
+    # Determine Stripe use case
+    stripe_use_case = "all"
+    if not stripe_enabled:
+        stripe_use_case = "disabled"
+    elif paymob_enabled:
+        stripe_use_case = "international_customers_only"
 
     return {
         "stripe_enabled": stripe_enabled,
         "publishable_key": pk if stripe_enabled else None,
         "paymob_enabled": paymob_enabled,
         "paymob_iframe_ready": paymob_iframe_ready,
+        "paymob_iframe_url": paymob_iframe_url,
+        "paymob_integration_ids": paymob_integration_ids,
+        "fawry_enabled": fawry_enabled,
+        "fawry_merchant_code": fawry_merchant_code if fawry_enabled else None,
         "paypal_enabled": paypal_enabled,
         "paypal_client_id": paypal_cid if paypal_enabled else None,
+        "default_currency": default_currency,
+        "stripe_use_case": stripe_use_case,
     }
 
 
