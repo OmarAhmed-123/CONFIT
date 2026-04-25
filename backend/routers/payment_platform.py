@@ -363,6 +363,73 @@ class PayPalCaptureBody(BaseModel):
     paypal_order_id: str = Field(..., min_length=1)
 
 
+class ValuEligibilityBody(BaseModel):
+    phone: str = Field(..., min_length=10, description="Customer phone number")
+    amount_piastres: int = Field(..., ge=1000, description="Amount in piastres (EGP * 100)")
+    tenor: Optional[int] = Field(6, description="Installment period in months (6, 9, 12, 18, 24)")
+
+
+class ValuEligibilityResponse(BaseModel):
+    eligible: bool
+    max_amount_egp: float
+    available_tenors: List[int]
+    requested_tenor: int
+    reason: Optional[str] = None
+
+
+@router.post("/api/payments/valu/eligibility", response_model=ValuEligibilityResponse)
+@limiter.limit(LIMIT_PAYMENT)
+async def check_valu_eligibility(
+    request: Request,
+    body: ValuEligibilityBody,
+):
+    """
+    Check Valu BNPL eligibility for a customer.
+
+    Returns eligibility status, maximum amount, and available installment tenors.
+    """
+    from services.payment_platform.providers import valu_check_eligibility
+
+    try:
+        result = await valu_check_eligibility(
+            customer_phone=body.phone,
+            amount_piastres=body.amount_piastres,
+            tenor=body.tenor,
+        )
+        return ValuEligibilityResponse(**result)
+    except Exception as e:
+        logger.exception("Valu eligibility check failed")
+        raise HTTPException(502, f"Valu eligibility check failed: {e}") from e
+
+
+@router.get("/api/payments/fawry/status/{reference_number}")
+@limiter.limit(LIMIT_PAYMENT)
+async def get_fawry_status(
+    request: Request,
+    reference_number: str,
+):
+    """
+    Get the status of a Fawry payment by reference number.
+
+    Returns payment status, amount, and other details.
+    """
+    from services.payment_platform.providers import fawry_get_charge_status
+
+    try:
+        result = await fawry_get_charge_status(charge_id=reference_number)
+        return {
+            "status": result.get("status"),
+            "amount": result.get("amount"),
+            "payment_method": result.get("payment_method"),
+            "reference_number": result.get("charge_id"),
+            "merchant_ref": result.get("merchant_ref"),
+            "provider": "fawry",
+        }
+    except Exception as e:
+        logger.exception("Fawry status check failed")
+        raise HTTPException(502, f"Fawry status check failed: {e}") from e
+
+
 @router.post("/api/payments/unified/paypal/capture")
 @limiter.limit(LIMIT_PAYMENT)
 async def paypal_capture_after_return(
