@@ -23,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/notification-preferences", tags=["Notification Preferences"])
 
+# V1 API Router (for frontend usePreferenceSync hook compatibility)
+v1_router = APIRouter(prefix="/api/v1/notifications", tags=["Notification Preferences V1"])
+
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────────
 
@@ -360,3 +363,181 @@ def check_dispatch_preferences(
         return {"should_dispatch": False, "frequency": "disabled"}
 
     return {"should_dispatch": True, "frequency": frequency}
+
+
+# ── V1 API Endpoints (for frontend usePreferenceSync compatibility) ─────────────────
+
+@v1_router.get("/preferences")
+async def get_v1_preferences(
+    user: UserProfile = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """V1 endpoint: Get notification preferences for current user."""
+    prefs = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user.id)
+        .first()
+    )
+    
+    if not prefs:
+        # Return default preferences
+        return {
+            "channels": {
+                "email": True,
+                "push": True,
+                "in_app": True,
+                "sms": False,
+            },
+            "types": {
+                "order_updates": True,
+                "promotions": True,
+                "account_security": True,
+                "newsletter": False,
+            },
+            "frequency": "real_time",
+            "quiet_hours": None,
+            "version": 1,
+            "updated_at": None,
+        }
+    
+    return {
+        "channels": prefs.channels or {"email": True, "push": True, "in_app": True, "sms": False},
+        "types": prefs.notification_types or ["order_updates", "promotions", "account_security"],
+        "frequency": prefs.frequency_settings or "real_time",
+        "quiet_hours": prefs.quiet_hours,
+        "version": 1,
+        "updated_at": prefs.updated_at.isoformat() if prefs.updated_at else None,
+    }
+
+
+@v1_router.put("/preferences")
+async def update_v1_preferences(
+    request: Request,
+    user: UserProfile = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """V1 endpoint: Update notification preferences with conflict detection."""
+    body = await request.json()
+    
+    # Check for conflict (optimistic locking)
+    client_version = body.get("version", 0)
+    
+    prefs = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user.id)
+        .first()
+    )
+    
+    if prefs:
+        server_version = getattr(prefs, "version", 0) or 0
+        if client_version < server_version:
+            raise HTTPException(
+                status_code=409,
+                detail="Conflict detected - preferences have been updated by another session",
+            )
+    
+    # Prepare update data
+    update_data = {
+        "user_id": user.id,
+        "channels": body.get("channels"),
+        "notification_types": body.get("types"),
+        "frequency_settings": body.get("frequency"),
+        "quiet_hours": body.get("quiet_hours"),
+        "version": client_version + 1,
+    }
+    
+    if prefs:
+        for key, value in update_data.items():
+            if value is not None:
+                setattr(prefs, key, value)
+        prefs.updated_at = datetime.utcnow()
+    else:
+        prefs = NotificationPreferences(
+            id=uuid.uuid4(),
+            **{k: v for k, v in update_data.items() if v is not None},
+        )
+        db.add(prefs)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "version": update_data["version"],
+        "updated_at": prefs.updated_at.isoformat() if prefs.updated_at else None,
+    }
+
+
+@v1_router.post("/preferences/sync")
+async def sync_v1_preferences(
+    request: Request,
+    user: UserProfile = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """V1 endpoint: Sync notification preferences (batch update)."""
+    body = await request.json()
+    
+    prefs = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user.id)
+        .first()
+    )
+    
+    updates = body.get("updates", {})
+    
+    if prefs:
+        if "channels" in updates:
+            prefs.channels = {**(prefs.channels or {}), **updates["channels"]}
+        if "types" in updates:
+            current_types = set(prefs.notification_types or [])
+            current_types.update(updates["types"])
+            prefs.notification_types = list(current_types)
+        if "frequency" in updates:
+            prefs.frequency_settings = updates["frequency"]
+        prefs.updated_at = datetime.utcnow()
+    else:
+        prefs = NotificationPreferences(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            channels=updates.get("channels"),
+            notification_types=updates.get("types"),
+            frequency_settings=updates.get("frequency"),
+            updated_at=datetime.utcnow(),
+        )
+        db.add(prefs)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "synced_at": datetime.utcnow().isoformat(),
+    }
+
+
+@v1_router.post("/preferences/reset")
+async def reset_v1_preferences(
+    user: UserProfile = Depends(require_auth),
+    db: Session = Depends(get_db),
+):
+    """V1 endpoint: Reset notification preferences to defaults."""
+    prefs = (
+        db.query(NotificationPreferences)
+        .filter(NotificationPreferences.user_id == user.id)
+        .first()
+    )
+    
+    if prefs:
+        prefs.channels = None
+        prefs.notification_types = None
+        prefs.frequency_settings = None
+        prefs.quiet_hours = None
+        prefs.updated_at = datetime.utcnow()
+        db.commit()
+    
+    return {
+        "success": True,
+        "message": "Preferences reset to defaults",
+    }
+
+
+# Export both routers for main app inclusion
+__all__ = ["router", "v1_router"]

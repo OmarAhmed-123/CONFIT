@@ -484,7 +484,7 @@ export function ChatbotWidget() {
                     >
                       {lastBotResponse.suggestions && (
                         <div className="flex flex-wrap gap-1">
-                          {lastBotResponse.suggestions.map((suggestion, index) => (
+                          {lastBotResponse.suggestions.map((suggestion: string, index: number) => (
                             <Badge
                               key={index}
                               variant="outline"
@@ -499,7 +499,7 @@ export function ChatbotWidget() {
                       
                       {lastBotResponse.actions && (
                         <div className="space-y-1">
-                          {lastBotResponse.actions.map((action, index) => (
+                          {lastBotResponse.actions.map((action: { label: string; action: string }, index: number) => (
                             <Button
                               key={index}
                               size="sm"

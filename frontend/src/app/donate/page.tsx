@@ -56,6 +56,11 @@ interface DonationState {
   status: string;
   client_secret: string | null;
   payment_intent_id: string | null;
+  coupon_code?: string;
+  credit?: {
+    total_credit?: number;
+    expires_at?: string;
+  };
 }
 
 // ============================================

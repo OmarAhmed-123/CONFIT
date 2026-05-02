@@ -5,7 +5,8 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { careService } from '../services/care.service';
+import { api } from '@/lib/api/client';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
 
 interface AdminStats {
   total_campaigns: number;
@@ -72,15 +73,14 @@ export const useAdminCareViewModel = (): UseAdminCareViewModel => {
     setError(null);
     
     try {
-      // Fetch admin CARE stats
-      const response = await fetch('/api/admin/care/stats');
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      } else {
-        // Use mock data for development
-        setStats(getMockStats());
-      }
+      const data = await api.get<any>(API_ENDPOINTS.CARE.DONOR_DASHBOARD);
+      setStats({
+        ...getMockStats(),
+        total_campaigns: Number(data.total_campaigns || 0),
+        active_campaigns: Number(data.active_campaigns || 0),
+        total_donated: Number(data.total_donated || 0),
+        total_beneficiaries: Number(data.active_beneficiaries || 0),
+      });
     } catch (err: any) {
       console.error('Error fetching admin stats:', err);
       setStats(getMockStats());
@@ -94,15 +94,24 @@ export const useAdminCareViewModel = (): UseAdminCareViewModel => {
     setError(null);
     
     try {
-      const query = filters?.status ? `?status=${filters.status}` : '';
-      const response = await fetch(`/api/admin/care/campaigns${query}`);
-      if (response.ok) {
-        const data = await response.json();
-        setCampaigns(data.campaigns || data);
-      } else {
-        // Use mock data for development
-        setCampaigns(getMockCampaigns());
-      }
+      const query = filters?.status ? `?status=${encodeURIComponent(filters.status)}` : '';
+      const data = await api.get<any>(`${API_ENDPOINTS.CARE.CAMPAIGNS}${query}`);
+      const list = Array.isArray(data.campaigns) ? data.campaigns : [];
+      setCampaigns(list.map((campaign: any) => ({
+        id: String(campaign.id),
+        campaign_name: String(campaign.campaign_name || campaign.title || 'Campaign'),
+        donor_name: String(campaign.donor_name || 'Donor'),
+        donor_id: String(campaign.donor_id || ''),
+        campaign_type: String(campaign.campaign_type || 'care'),
+        status: String(campaign.status || 'draft'),
+        total_beneficiaries: Number(campaign.total_beneficiaries || 0),
+        total_budget_allocated: Number(campaign.total_budget_allocated || campaign.target_amount || 0),
+        total_budget_used: Number(campaign.total_budget_used || campaign.current_amount || 0),
+        engagement_rate: Number(campaign.engagement_rate || 0),
+        completion_rate: Number(campaign.completion_rate || 0),
+        created_at: String(campaign.created_at || ''),
+        end_date: campaign.end_date,
+      })));
       
       // Fetch activity log
       setRecentActivity(getMockActivity());

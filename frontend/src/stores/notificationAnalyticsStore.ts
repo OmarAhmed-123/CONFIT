@@ -288,14 +288,7 @@ export const useNotificationAnalyticsStore = create<NotificationAnalyticsState>(
         const cached = state._kpiCache[period];
         if (isCacheValid(cached)) return cached.data;
 
-        const kpis = computeKPIs(state.events, period);
-        set((s) => ({
-          _kpiCache: {
-            ...s._kpiCache,
-            [period]: { data: kpis, timestamp: Date.now() },
-          },
-        }));
-        return kpis;
+        return computeKPIs(state.events, period);
       },
 
       getChannelMetrics: (period) => {
@@ -310,15 +303,7 @@ export const useNotificationAnalyticsStore = create<NotificationAnalyticsState>(
         );
 
         const channels: AnalyticsChannel[] = ['in_app', 'email', 'push'];
-        const metrics = channels.map((ch) => computeChannelMetrics(periodEvents, ch));
-
-        set((s) => ({
-          _channelCache: {
-            ...s._channelCache,
-            [period]: { data: metrics, timestamp: Date.now() },
-          },
-        }));
-        return metrics;
+        return channels.map((ch) => computeChannelMetrics(periodEvents, ch));
       },
 
       getFilteredEvents: (period, filters) => {

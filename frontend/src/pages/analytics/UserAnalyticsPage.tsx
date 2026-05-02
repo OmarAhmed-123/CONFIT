@@ -411,7 +411,7 @@ export default function UserAnalyticsPage() {
                               {new Date(activity.date).toLocaleString()}
                             </p>
                           </div>
-                          {activity.details.store_id && (
+                          {Boolean((activity.details as Record<string, unknown>).store_id) && (
                             <Badge variant="outline" className="text-xs">
                               Store
                             </Badge>

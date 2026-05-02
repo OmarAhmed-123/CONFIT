@@ -154,7 +154,7 @@ def _outfit_to_response(outfit: InfluencerOutfit, is_liked: bool = False, is_sav
 
 # ── Influencer Profile Endpoints ────────────────────────────────────────────────
 
-@router.post("/profile", response_model=InfluencerProfileResponse)
+@router.post("/profile", response_model=InfluencerProfileResponse, include_in_schema=False)
 async def create_influencer_profile(
     payload: InfluencerProfileCreate,
     db: Session = Depends(get_db),
@@ -187,7 +187,7 @@ async def create_influencer_profile(
     return _influencer_to_response(influencer)
 
 
-@router.get("/profile", response_model=InfluencerProfileResponse)
+@router.get("/profile", response_model=InfluencerProfileResponse, include_in_schema=False)
 async def get_my_influencer_profile(
     db: Session = Depends(get_db),
     user: UserProfile = Depends(require_auth),
@@ -199,7 +199,7 @@ async def get_my_influencer_profile(
     return _influencer_to_response(influencer)
 
 
-@router.patch("/profile", response_model=InfluencerProfileResponse)
+@router.patch("/profile", response_model=InfluencerProfileResponse, include_in_schema=False)
 async def update_influencer_profile(
     payload: InfluencerProfileUpdate,
     db: Session = Depends(get_db),
@@ -300,7 +300,7 @@ async def list_influencers(
 
 # ── Outfit Collection Endpoints ─────────────────────────────────────────────────
 
-@router.post("/outfits", response_model=InfluencerOutfitResponse)
+@router.post("/outfits", response_model=InfluencerOutfitResponse, include_in_schema=False)
 async def create_outfit(
     payload: InfluencerOutfitCreate,
     db: Session = Depends(get_db),
@@ -333,7 +333,7 @@ async def create_outfit(
     return _outfit_to_response(outfit)
 
 
-@router.post("/outfits/{outfit_id}/publish", response_model=InfluencerOutfitResponse)
+@router.post("/outfits/{outfit_id}/publish", response_model=InfluencerOutfitResponse, include_in_schema=False)
 async def publish_outfit(
     outfit_id: str,
     db: Session = Depends(get_db),
@@ -361,7 +361,7 @@ async def publish_outfit(
     return _outfit_to_response(outfit)
 
 
-@router.get("/outfits", response_model=List[InfluencerOutfitListResponse])
+@router.get("/outfits", response_model=List[InfluencerOutfitListResponse], include_in_schema=False)
 async def list_my_outfits(
     status: Optional[str] = Query(None),
     limit: int = Query(20, ge=1, le=100),
@@ -399,7 +399,7 @@ async def list_my_outfits(
     ]
 
 
-@router.get("/outfits/{outfit_id}", response_model=InfluencerOutfitResponse)
+@router.get("/outfits/{outfit_id}", response_model=InfluencerOutfitResponse, include_in_schema=False)
 async def get_outfit(
     outfit_id: str,
     db: Session = Depends(get_db),
@@ -441,7 +441,7 @@ async def get_outfit(
     return _outfit_to_response(outfit, is_liked, is_saved)
 
 
-@router.patch("/outfits/{outfit_id}", response_model=InfluencerOutfitResponse)
+@router.patch("/outfits/{outfit_id}", response_model=InfluencerOutfitResponse, include_in_schema=False)
 async def update_outfit(
     outfit_id: str,
     payload: InfluencerOutfitUpdate,
@@ -472,7 +472,7 @@ async def update_outfit(
     return _outfit_to_response(outfit)
 
 
-@router.delete("/outfits/{outfit_id}")
+@router.delete("/outfits/{outfit_id}", include_in_schema=False)
 async def delete_outfit(
     outfit_id: str,
     db: Session = Depends(get_db),
@@ -640,7 +640,7 @@ async def get_discover_page(
     )
 
 
-@router.get("/featured", response_model=FeaturedInfluencersResponse)
+@router.get("/featured", response_model=FeaturedInfluencersResponse, include_in_schema=False)
 async def get_featured_influencers(
     category: Optional[str] = Query(None),
     limit: int = Query(10, ge=1, le=50),
@@ -756,7 +756,7 @@ async def unfollow_influencer(
 
 # ── Like & Save Endpoints ───────────────────────────────────────────────────────
 
-@router.post("/outfits/{outfit_id}/like", response_model=OutfitActionResponse)
+@router.post("/outfits/{outfit_id}/like", response_model=OutfitActionResponse, include_in_schema=False)
 async def like_outfit(
     outfit_id: str,
     db: Session = Depends(get_db),
@@ -799,7 +799,7 @@ async def like_outfit(
         )
 
 
-@router.post("/outfits/{outfit_id}/save", response_model=OutfitActionResponse)
+@router.post("/outfits/{outfit_id}/save", response_model=OutfitActionResponse, include_in_schema=False)
 async def save_outfit(
     outfit_id: str,
     payload: OutfitSaveRequest = None,
@@ -848,7 +848,7 @@ async def save_outfit(
 
 # ── Affiliate Link Endpoints ────────────────────────────────────────────────────
 
-@router.post("/affiliate-links", response_model=AffiliateLinkResponse)
+@router.post("/affiliate-links", response_model=AffiliateLinkResponse, include_in_schema=False)
 async def create_affiliate_link(
     payload: AffiliateLinkCreate,
     db: Session = Depends(get_db),
@@ -903,7 +903,7 @@ async def create_affiliate_link(
     )
 
 
-@router.get("/affiliate-links", response_model=List[AffiliateLinkResponse])
+@router.get("/affiliate-links", response_model=List[AffiliateLinkResponse], include_in_schema=False)
 async def list_affiliate_links(
     is_active: Optional[bool] = Query(None),
     limit: int = Query(50, ge=1, le=200),
@@ -951,7 +951,7 @@ async def list_affiliate_links(
     ]
 
 
-@router.post("/track-click", response_model=AffiliateClickResponse)
+@router.post("/track-click", response_model=AffiliateClickResponse, include_in_schema=False)
 async def track_affiliate_click(
     payload: AffiliateClickRequest,
     background_tasks: BackgroundTasks,
@@ -990,7 +990,7 @@ async def track_affiliate_click(
 
 # ── Commission Endpoints ────────────────────────────────────────────────────────
 
-@router.get("/commissions", response_model=CommissionSummary)
+@router.get("/commissions", response_model=CommissionSummary, include_in_schema=False)
 async def get_commission_summary(
     db: Session = Depends(get_db),
     user: UserProfile = Depends(require_auth),
@@ -1066,7 +1066,7 @@ async def get_commission_summary(
 
 # ── Product Recommendations ────────────────────────────────────────────────────
 
-@router.post("/recommendations", response_model=ProductRecommendationResponse)
+@router.post("/recommendations", response_model=ProductRecommendationResponse, include_in_schema=False)
 async def create_recommendation(
     payload: ProductRecommendationCreate,
     db: Session = Depends(get_db),
@@ -1125,7 +1125,7 @@ async def create_recommendation(
     )
 
 
-@router.get("/{influencer_id}/recommendations", response_model=List[ProductRecommendationResponse])
+@router.get("/{influencer_id}/recommendations", response_model=List[ProductRecommendationResponse], include_in_schema=False)
 async def get_influencer_recommendations(
     influencer_id: str,
     limit: int = Query(20, ge=1, le=100),

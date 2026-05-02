@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { RefreshCw, Sparkles, Users, Activity, ArrowRight, TrendingUp } from "lucide-react";
 
@@ -40,7 +40,7 @@ function fmtPct01(v: number) {
   return `${(v * 100).toFixed(1)}%`;
 }
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 16, filter: "blur(6px)" },
   visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.45, ease: "easeInOut" } },
 };

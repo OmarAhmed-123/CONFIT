@@ -39,6 +39,62 @@ def get_client_info(request: Request) -> dict:
     }
 
 
+@router.get("", response_model=dict)
+async def get_profile(
+    user: UserProfile = Depends(require_auth),
+    profile_service: ProfileService = Depends(get_profile_service),
+):
+    """Get unified user profile summary."""
+    style = profile_service.get_style_profile(user.id)
+    body = profile_service.get_body_profile(user.id)
+    budget = profile_service.get_budget_profile(user.id)
+    completeness = profile_service.get_completeness(user.id)
+    return {
+        "user_id": user.id,
+        "style_profile": style,
+        "body_profile": body,
+        "budget_profile": budget,
+        "completeness": completeness,
+    }
+
+
+@router.patch("", response_model=dict)
+async def update_profile(
+    data: dict,
+    request: Request,
+    user: UserProfile = Depends(require_auth),
+    profile_service: ProfileService = Depends(get_profile_service),
+):
+    """Update user profile fields."""
+    client = get_client_info(request)
+    updated = {}
+    if "style_profile" in data:
+        updated["style_profile"] = profile_service.update_style_profile(
+            user_id=user.id,
+            data=StyleProfileCreate(**data["style_profile"]),
+            source="explicit",
+            ip_address=client["ip_address"],
+            user_agent=client["user_agent"],
+        )
+    if "body_profile" in data:
+        updated["body_profile"] = profile_service.update_body_profile(
+            user_id=user.id,
+            data=BodyProfileCreate(**data["body_profile"]),
+            source="explicit",
+            ip_address=client["ip_address"],
+            user_agent=client["user_agent"],
+        )
+    if "budget_profile" in data:
+        updated["budget_profile"] = profile_service.update_budget_profile(
+            user_id=user.id,
+            data=BudgetProfileCreate(**data["budget_profile"]),
+            source="explicit",
+            ip_address=client["ip_address"],
+            user_agent=client["user_agent"],
+        )
+    return {"user_id": user.id, "updated": updated}
+
+
 @router.get("/style", response_model=StyleProfileResponse)
 async def get_style_profile(
     user: UserProfile = Depends(require_auth),

@@ -49,8 +49,8 @@ export default function AuthCallback() {
   const [errorInfo, setErrorInfo] = useState(DEFAULT_ERROR);
 
   useEffect(() => {
-    const error = searchParams.get('error');
-    const token = searchParams.get('token') || searchParams.get('access_token');
+    const error = searchParams?.get('error');
+    const token = searchParams?.get('token') || searchParams?.get('access_token');
 
     if (error) {
       setErrorInfo(ERROR_MESSAGES[error] || DEFAULT_ERROR);
@@ -61,7 +61,7 @@ export default function AuthCallback() {
     if (token) {
       // Store token and refresh user state
       localStorage.setItem('confit_token', token);
-      const refreshToken = searchParams.get('refresh_token');
+      const refreshToken = searchParams?.get('refresh_token');
       if (refreshToken) {
         localStorage.setItem('confit_refresh_token', refreshToken);
       }

@@ -61,6 +61,7 @@ interface UseMuseReturn {
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/ai';
+const MUSE_API = `${API_BASE}/muse`;
 
 export function useMuse(options: UseMuseOptions = {}): UseMuseReturn {
   const { language = 'en', sessionId: initialSessionId, onError } = options;
@@ -99,7 +100,7 @@ export function useMuse(options: UseMuseOptions = {}): UseMuseReturn {
     abortControllerRef.current = new AbortController();
     
     try {
-      const response = await fetch(`${API_BASE}/muse/chat`, {
+      const response = await fetch(`${MUSE_API}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -160,7 +161,7 @@ export function useMuse(options: UseMuseOptions = {}): UseMuseReturn {
   const clearSession = useCallback(async () => {
     if (sessionId) {
       try {
-        await fetch(`${API_BASE}/muse/session/${sessionId}`, {
+        await fetch(`${MUSE_API}/session/${sessionId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${getAuthToken()}`,
@@ -182,7 +183,7 @@ export function useMuse(options: UseMuseOptions = {}): UseMuseReturn {
     if (!sessionId) return;
     
     try {
-      const response = await fetch(`${API_BASE}/muse/session/${sessionId}/history`, {
+      const response = await fetch(`${MUSE_API}/history/${sessionId}`, {
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`,
         },

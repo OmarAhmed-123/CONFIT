@@ -28,6 +28,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 import inspect
 
+# Load environment variables from project root and backend/.env before settings import.
+# backend/.env may override root .env for backend-specific deployments.
+_BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=str(_BACKEND_DIR.parent / ".env"))
+load_dotenv(dotenv_path=str(_BACKEND_DIR / ".env"), override=True)
+
 from core.config import settings
 from core.exceptions import register_exception_handlers
 from core.slowapi_limiter import limiter
@@ -40,18 +46,26 @@ try:
 except ImportError:
     HAS_SLOWAPI = False
 
-# Load environment variables from backend/.env (explicit path; not dependent on CWD)
-load_dotenv(dotenv_path=str(Path(__file__).resolve().parent / ".env"))
+# ── Structured Logging (structlog) ────────────────────────────────
 
-# ── Logging Configuration ─────────────────────────────────────────
+from core.logging import configure_logging, get_logger, StructlogContextMiddleware
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger("confit-backend")
+configure_logging()
+logger = get_logger("confit-backend")
+
+# ── Sentry ────────────────────────────────────────────────────────
+
+from core.observability.sentry import init_sentry
+
+init_sentry()
+
+# ── Prometheus Instrumentation ────────────────────────────────────
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    HAS_PROMETHEUS_INSTRUMENTATOR = True
+except ImportError:
+    HAS_PROMETHEUS_INSTRUMENTATOR = False
 
 
 # ── App Lifespan ───────────────────────────────────────────────────
@@ -425,40 +439,22 @@ app.add_middleware(
     is_production=IS_PRODUCTION,
 )
 
-# ── Request Logging Middleware ──────────────────────────────────────
-import time
-from starlette.middleware.base import BaseHTTPMiddleware
+# ── Structured Logging Middleware ──────────────────────────────────
+app.add_middleware(StructlogContextMiddleware)
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        start_time = time.time()
-        
-        # Log incoming request
-        logger.info(
-            "INCOMING: %s %s from %s",
-            request.method,
-            request.url.path,
-            request.client.host if request.client else "unknown",
+# ── Prometheus Instrumentator ─────────────────────────────────────
+if HAS_PROMETHEUS_INSTRUMENTATOR:
+    try:
+        Instrumentator().instrument(app).expose(
+            app,
+            endpoint="/api/metrics/instrumentator",
+            include_in_schema=False,
         )
-        
-        # Process request
-        response = await call_next(request)
-        
-        # Calculate duration
-        duration = (time.time() - start_time) * 1000
-        
-        # Log response
-        logger.info(
-            "RESPONSE: %s %s -> %s (%.2fms)",
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration,
-        )
-        
-        return response
-
-app.add_middleware(RequestLoggingMiddleware)
+        logger.info("Prometheus fastapi-instrumentator enabled")
+    except Exception as exc:
+        logger.warning("Prometheus instrumentator failed: %s", exc)
+else:
+    logger.info("prometheus-fastapi-instrumentator not installed — default HTTP metrics disabled")
 
 # ── Security Headers Middleware ──────────────────────────────────────
 from core.middleware.security import SecurityHeadersMiddleware, InputValidationMiddleware, CSRFMiddleware
@@ -476,6 +472,7 @@ from routers.rotation import router as rotation_router
 from routers.auth import router as auth_router
 from routers.products import router as products_router
 from routers.orders import router as orders_router
+from routers.cart import router as cart_router
 from routers.commerce import router as commerce_router
 from routers.fashion_os import router as fashion_os_router
 from routers.newsletter import router as newsletter_router
@@ -510,7 +507,7 @@ from routers.security import router as security_router
 from routers.growth_engine import router as growth_engine_router
 from routers.tryon_runtime import router as tryon_runtime_router
 from routers.experiments import router as experiments_router
-from routers.pitch_deck import router as pitch_deck_router
+from routers.data_compliance import router as data_compliance_router
 from routers.dataset_export import router as dataset_export_router
 from routers.training_pipeline import router as training_pipeline_router
 from routers.notifications import router as notifications_router
@@ -522,10 +519,11 @@ from routers.debug_payments import router as debug_payments_router
 from routers.sales_analytics import router as sales_analytics_router
 from api.notification_analytics import router as notification_analytics_router
 from api.notification_ml import router as notification_ml_router
+from api.ai_endpoints import include_ai_routers
 from api.alert_rules import router as alert_rules_router
 from routers.oauth import router as oauth_router
 from routers.stripe_checkout import router as stripe_checkout_router
-from routers.care import router as care_router
+from routers.care_router import router as care_router
 from routers.donations import router as donations_router
 from routers.analytics_store import router as analytics_store_router
 from routers.analytics_factory import router as analytics_factory_router
@@ -536,7 +534,13 @@ from routers.v1_mirror import router as v1_mirror_router
 from routers.v1_visual_search import router as v1_visual_search_router
 from routers.v1_closet import router as v1_closet_router
 from routers.v1_ai_admin import router as v1_ai_admin_router
+from routers.wardrobe_analytics import router as wardrobe_analytics_router
+from routers.health import router as health_router
+from routers.metrics import router as metrics_router
+from routers.admin_panel import router as admin_panel_router
 
+app.include_router(health_router)
+app.include_router(metrics_router)
 app.include_router(tryon_router)
 app.include_router(body_dna_router)
 app.include_router(stylist_router)
@@ -545,6 +549,7 @@ app.include_router(rotation_router)
 app.include_router(auth_router)
 app.include_router(products_router)
 app.include_router(orders_router)
+app.include_router(cart_router)
 app.include_router(commerce_router)
 app.include_router(fashion_os_router)
 app.include_router(newsletter_router)
@@ -573,23 +578,27 @@ app.include_router(outfit_ratings_router)
 app.include_router(style_dna_router)
 app.include_router(closet_planner_router)
 app.include_router(influencer_router)
+app.include_router(wardrobe_analytics_router)  # Wardrobe Analytics (E.5)
 app.include_router(sustainability_router)
 app.include_router(security_router)
 app.include_router(growth_engine_router)
 app.include_router(tryon_runtime_router)
 app.include_router(experiments_router)
-app.include_router(pitch_deck_router)
-app.include_router(dataset_export_router)
-app.include_router(training_pipeline_router)
+# Internal/admin routers - hidden from public API docs (E.1)
+app.include_router(dataset_export_router, include_in_schema=False)
+app.include_router(training_pipeline_router, include_in_schema=False)
+app.include_router(notification_analytics_router, include_in_schema=False)
+app.include_router(notification_ml_router, include_in_schema=False)
 app.include_router(notifications_router)
 app.include_router(customer_notifications_router)
 app.include_router(notification_preferences_router)
-app.include_router(ecosystem_router)
-app.include_router(debug_logs_router)
-app.include_router(debug_payments_router)
+# Internal service routers - hidden from public API docs (E.1)
+app.include_router(ecosystem_router, include_in_schema=False)
+app.include_router(debug_logs_router, include_in_schema=False)
+app.include_router(debug_payments_router, include_in_schema=False)
 app.include_router(sales_analytics_router)
-app.include_router(notification_analytics_router)
-app.include_router(notification_ml_router)
+# Public API routers
+app.include_router(data_compliance_router)  # GDPR/Data Compliance (E.3)
 app.include_router(alert_rules_router)
 app.include_router(oauth_router)
 app.include_router(stripe_checkout_router)
@@ -599,11 +608,15 @@ app.include_router(analytics_store_router)
 app.include_router(analytics_factory_router)
 app.include_router(analytics_user_router)
 app.include_router(analytics_admin_router)
+app.include_router(admin_panel_router)
 app.include_router(v1_muse_router)
 app.include_router(v1_mirror_router)
 app.include_router(v1_visual_search_router)
 app.include_router(v1_closet_router)
 app.include_router(v1_ai_admin_router)
+
+# Mount legacy /api/ai/* routes (used by frontend hooks)
+include_ai_routers(app)
 
 # ── Domain Event Handlers ───────────────────────────────────────────
 try:
@@ -718,19 +731,7 @@ async def tryon_preview_alias(request: Request):
         return JSONResponse(status_code=500, content=fail("Try-on preview failed."))
 
 
-# ── Health Check ───────────────────────────────────────────────────
-
-@app.get("/api/health", tags=["System"])
-async def health_check():
-    """Global health check endpoint."""
-    return ok({
-        "status": "ok",
-        "service": "confit-backend",
-        "version": "1.0.0",
-        "activeHost": os.getenv("CONFIT_ACTIVE_HOST"),
-        "activePort": os.getenv("CONFIT_ACTIVE_PORT"),
-    })
-
+# ── Root Endpoint ──────────────────────────────────────────────────
 
 @app.get("/", tags=["System"])
 async def root():

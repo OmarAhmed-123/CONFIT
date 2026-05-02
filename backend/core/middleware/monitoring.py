@@ -2,6 +2,7 @@
 CONFIT Backend - Monitoring Middleware
 ======================================
 Prometheus metrics collection and health checks.
+Idempotent registration for uvicorn reload compatibility.
 """
 
 import time
@@ -12,10 +13,69 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import Message
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
 
 
 logger = logging.getLogger(__name__)
+
+_metrics_cache = {}
+
+
+def _get_or_create_counter(name: str, documentation: str, labelnames: list[str] = None):
+    """Get existing counter or create new one (idempotent for reloads)."""
+    cache_key = f"counter:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        metric = Counter(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
+
+
+def _get_or_create_histogram(name: str, documentation: str, labelnames: list[str] = None, buckets: list[float] = None):
+    """Get existing histogram or create new one (idempotent for reloads)."""
+    cache_key = f"histogram:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        if buckets:
+            metric = Histogram(name, documentation, labelnames, buckets=buckets)
+        else:
+            metric = Histogram(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
+
+
+def _get_or_create_gauge(name: str, documentation: str, labelnames: list[str] = None):
+    """Get existing gauge or create new one (idempotent for reloads)."""
+    cache_key = f"gauge:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        metric = Gauge(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -23,14 +83,14 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Request counter
-REQUEST_COUNT = Counter(
+REQUEST_COUNT = _get_or_create_counter(
     "http_requests_total",
     "Total HTTP requests",
     ["method", "endpoint", "status"]
 )
 
 # Request duration histogram
-REQUEST_LATENCY = Histogram(
+REQUEST_LATENCY = _get_or_create_histogram(
     "http_request_duration_seconds",
     "HTTP request latency",
     ["method", "endpoint"],
@@ -38,32 +98,32 @@ REQUEST_LATENCY = Histogram(
 )
 
 # Active requests gauge
-ACTIVE_REQUESTS = Gauge(
+ACTIVE_REQUESTS = _get_or_create_gauge(
     "http_requests_active",
     "Active HTTP requests"
 )
 
 # Error counter
-ERROR_COUNT = Counter(
+ERROR_COUNT = _get_or_create_counter(
     "http_errors_total",
     "Total HTTP errors",
     ["method", "endpoint", "error_type"]
 )
 
 # Database connection pool gauge
-DB_CONNECTIONS = Gauge(
+DB_CONNECTIONS = _get_or_create_gauge(
     "db_connections_active",
     "Active database connections"
 )
 
 # Redis connection gauge
-REDIS_CONNECTIONS = Gauge(
+REDIS_CONNECTIONS = _get_or_create_gauge(
     "redis_connections_active",
     "Active Redis connections"
 )
 
 # Celery queue length gauge
-CELERY_QUEUE_LENGTH = Gauge(
+CELERY_QUEUE_LENGTH = _get_or_create_gauge(
     "celery_queue_length",
     "Celery queue length",
     ["queue"]

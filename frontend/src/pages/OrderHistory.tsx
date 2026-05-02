@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { createTransition } from '@/motion';
+import { safeImageSrc } from '@/lib/imageFallback';
 
 // Types
 interface OrderItem {
@@ -108,6 +109,75 @@ const MOCK_ORDERS: Order[] = [
     }
 ];
 
+function toNumber(value: unknown, fallback = 0): number {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeStatus(value: unknown): Order['status'] {
+    const status = String(value || 'processing').toLowerCase();
+    if (['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
+        return status as Order['status'];
+    }
+    if (status === 'confirmed') return 'processing';
+    return 'processing';
+}
+
+function normalizeShippingAddress(raw: any): Order['shippingAddress'] {
+    const name = String(raw?.name || '').trim();
+    const [firstName = 'Customer', ...rest] = name.split(/\s+/).filter(Boolean);
+    return {
+        firstName: raw?.firstName || raw?.first_name || firstName,
+        lastName: raw?.lastName || raw?.last_name || rest.join(' '),
+        address: raw?.address || raw?.street || '',
+        city: raw?.city || '',
+        state: raw?.state || '',
+        zipCode: raw?.zipCode || raw?.zip_code || raw?.zip || '',
+        country: raw?.country || 'US',
+        phone: raw?.phone || '',
+    };
+}
+
+function normalizeOrderItem(raw: any, index: number): OrderItem {
+    return {
+        id: String(raw?.id || `${raw?.productId || raw?.product_id || 'item'}-${index}`),
+        productId: String(raw?.productId || raw?.product_id || ''),
+        productName: String(raw?.productName || raw?.product_name || raw?.name || 'Product'),
+        productImage: safeImageSrc(raw?.productImage || raw?.product_image || raw?.image || raw?.image_url || ''),
+        brand: String(raw?.brand || ''),
+        size: String(raw?.size || 'One Size'),
+        color: String(raw?.color || 'Default'),
+        price: toNumber(raw?.price),
+        quantity: Math.max(1, Math.round(toNumber(raw?.quantity, 1))),
+    };
+}
+
+function normalizeOrder(raw: any): Order {
+    const items = Array.isArray(raw?.items)
+        ? raw.items.map((item: any, index: number) => normalizeOrderItem(item, index))
+        : [];
+    const subtotal = toNumber(
+        raw?.subtotal,
+        items.reduce((sum: number, item: OrderItem) => sum + item.price * item.quantity, 0)
+    );
+    const total = toNumber(raw?.total, subtotal);
+    return {
+        id: String(raw?.id || raw?.order_id || raw?.orderNumber || raw?.order_number || ''),
+        orderNumber: String(raw?.orderNumber || raw?.order_number || raw?.id || 'CONF'),
+        placedAt: String(raw?.placedAt || raw?.placed_at || raw?.created_at || new Date().toISOString()),
+        status: normalizeStatus(raw?.status || raw?.order_status),
+        items,
+        subtotal,
+        shipping: toNumber(raw?.shipping || raw?.shipping_cost),
+        tax: toNumber(raw?.tax),
+        total,
+        trackingNumber: raw?.trackingNumber || raw?.tracking_number,
+        estimatedDelivery: raw?.estimatedDelivery || raw?.estimated_delivery,
+        shippingAddress: normalizeShippingAddress(raw?.shippingAddress || raw?.shipping_address || {}),
+        paymentMethod: String(raw?.paymentMethod || raw?.payment_method || 'Card'),
+    };
+}
+
 export default function OrderHistory() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -117,18 +187,21 @@ export default function OrderHistory() {
     useEffect(() => {
         const fetchOrders = async () => {
             try {
-                // In a real app, fetch from API
-                // const res = await fetch(`${apiUrl}/api/orders`);
-                // const data = await res.json();
+                setIsLoading(true);
+                // Import API client dynamically to avoid SSR issues
+                const { api } = await import('@/lib/api/client');
+                const { API_ENDPOINTS } = await import('@/lib/api/endpoints');
 
-                // Simulating network delay
-                setTimeout(() => {
-                    setOrders(MOCK_ORDERS);
-                    setIsLoading(false);
-                }, 800);
+                const data = await api.get<{ orders?: unknown[] }>(API_ENDPOINTS.ORDERS.LIST);
+                const normalized = Array.isArray(data.orders)
+                    ? data.orders.map((order) => normalizeOrder(order))
+                    : [];
+                setOrders(normalized);
             } catch (error) {
                 console.error("Failed to fetch orders", error);
-                setOrders(MOCK_ORDERS);
+                toast.error("Failed to load orders. Please try again.");
+                setOrders([]);
+            } finally {
                 setIsLoading(false);
             }
         };
@@ -170,7 +243,7 @@ export default function OrderHistory() {
         order.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    if (loading) {
+    if (isLoading) {
         return (
             <MainLayout>
                 <div className="min-h-[70vh] flex items-center justify-center">
@@ -293,7 +366,7 @@ export default function OrderHistory() {
                                                         <div key={item.id} className="flex gap-4 group/item">
                                                             <div className="relative h-24 w-20 flex-shrink-0 overflow-hidden rounded-md border border-border bg-muted">
                                                                 <img
-                                                                    src={item.productImage}
+                                                                    src={safeImageSrc(item.productImage)}
                                                                     alt={item.productName}
                                                                     className="h-full w-full object-cover object-center transition-transform group-hover/item:scale-105"
                                                                 />
@@ -364,16 +437,8 @@ export default function OrderHistory() {
                                 <div className="space-y-4">
                                     <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Order Status</h3>
                                     <div className="relative">
-                                        <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-muted">
-                                            <div style={{
-                                                width:
-                                                    selectedOrder.status === 'pending' ? '25%' :
-                                                        selectedOrder.status === 'processing' ? '50%' :
-                                                            selectedOrder.status === 'shipped' ? '75%' :
-                                                                selectedOrder.status === 'delivered' ? '100%' : '0%'
-                                            }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-accent transition-all duration-500"></div>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-medium text-muted-foreground">
+                                        <OrderStatusBar status={selectedOrder.status} />
+                                        <div className="flex justify-between text-xs font-medium text-muted-foreground mt-4">
                                             <span className={selectedOrder.status !== 'cancelled' ? 'text-foreground' : ''}>Ordered</span>
                                             <span className={['processing', 'shipped', 'delivered'].includes(selectedOrder.status) ? 'text-foreground' : ''}>Processing</span>
                                             <span className={['shipped', 'delivered'].includes(selectedOrder.status) ? 'text-foreground' : ''}>Shipped</span>
@@ -388,7 +453,7 @@ export default function OrderHistory() {
                                     <div className="space-y-4">
                                         {selectedOrder.items.map(item => (
                                             <div key={item.id} className="flex gap-4 pb-4 border-b last:border-0 last:pb-0">
-                                                <img src={item.productImage} alt={item.productName} className="w-16 h-16 object-cover rounded border" />
+                                                <img src={safeImageSrc(item.productImage)} alt={item.productName} className="w-16 h-16 object-cover rounded border" />
                                                 <div className="flex-1">
                                                     <div className="flex justify-between">
                                                         <h4 className="font-medium text-sm">{item.productName}</h4>
@@ -450,5 +515,32 @@ export default function OrderHistory() {
                 )}
             </AnimatePresence>
         </MainLayout>
+    );
+}
+
+/**
+ * OrderStatusBar sub-component - avoids inline styles for dynamic width
+ */
+function OrderStatusBar({ status }: { status: string }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const width =
+        status === 'pending' ? '25%' :
+        status === 'processing' ? '50%' :
+        status === 'shipped' ? '75%' :
+        status === 'delivered' ? '100%' : '0%';
+
+    useEffect(() => {
+        if (ref.current) {
+            ref.current.style.width = width;
+        }
+    }, [width]);
+
+    return (
+        <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-muted">
+            <div
+                ref={ref}
+                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-accent transition-all duration-500"
+            />
+        </div>
     );
 }

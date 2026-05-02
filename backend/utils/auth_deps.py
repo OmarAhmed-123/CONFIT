@@ -60,8 +60,8 @@ async def require_admin(
     db: Session = Depends(get_db),
 ) -> UserProfile:
     """Require an authenticated admin user."""
-    role_row = db.query(UserRole).filter(UserRole.user_id == user.id).first()
-    if not role_row or role_row.role != AppRole.admin:
+    roles = {row.role for row in db.query(UserRole).filter(UserRole.user_id == user.id).all()}
+    if AppRole.admin not in roles:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 

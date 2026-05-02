@@ -6,7 +6,7 @@
 export const isDev = process.env.NODE_ENV === 'development';
 
 export function getPublicApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001').replace(/\/$/, '');
+  return (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
 }
 
 /** OAuth / auth authority (falls back to app origin in dev). */

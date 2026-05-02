@@ -1,7 +1,6 @@
 import { Sparkles, Camera, Wand2, ArrowRight } from "lucide-react";
 import Link from 'next/link';
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { createTransition } from "@/motion";
 import { MagneticButton } from "@/components/ui/MagneticButton";
 
@@ -74,14 +73,10 @@ export function Actions({ onFindMyStyle }: { onFindMyStyle: () => void }) {
                   <p className="mt-3 text-body-sm text-muted-foreground">{action.description}</p>
 
                   <div className="mt-6 flex items-center justify-between">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-full px-3 text-sm opacity-100 bg-transparent hover:bg-white/5 hover:text-accent"
-                    >
+                    <span className="inline-flex items-center justify-center rounded-full px-3 py-2 text-sm opacity-100 bg-transparent transition-colors group-hover:text-accent">
                       <span className="font-semibold">Start</span>
                       <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </Button>
+                    </span>
 
                     <span className="text-xs text-muted-foreground">Luxury flow</span>
                   </div>

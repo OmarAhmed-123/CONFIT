@@ -5,12 +5,29 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, lazy, Suspense, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MainLayout } from '@/components/layout';
-import { AIExperience, Actions, CTA, Hero, Occasions, Picks, Trending, TodaysStylePicks } from '@/components/sections';
+import { Hero, Actions, CTA, Occasions } from '@/components/sections';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { SectionSkeleton } from '@/components/loading/SectionSkeleton';
+
+// Lazy load heavy below-the-fold sections to reduce initial bundle
+const TodaysStylePicks = lazy(() => import('@/components/sections/TodaysStylePicks').then(m => ({ default: m.TodaysStylePicks })));
+const Picks = lazy(() => import('@/components/sections/Picks').then(m => ({ default: m.Picks })));
+const AIExperience = lazy(() => import('@/components/sections/AIExperience').then(m => ({ default: m.AIExperience })));
+const Trending = lazy(() => import('@/components/sections/Trending').then(m => ({ default: m.Trending })));
+
+function LazySection({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<SectionSkeleton />}>
+      {children}
+    </Suspense>
+  );
+}
+
+const MemoizedHero = memo(Hero);
 
 export default function HomePage() {
   const router = useRouter();
@@ -62,16 +79,24 @@ export default function HomePage() {
 
   return (
     <MainLayout fullWidth>
-      <Hero
+      <MemoizedHero
         onStartStyling={() => triggerAI("I need an outfit for a wedding under $150")}
         onTryItOn={() => router.push("/try-on")}
       />
-      <TodaysStylePicks />
+      <LazySection>
+        <TodaysStylePicks />
+      </LazySection>
       <Actions onFindMyStyle={() => triggerAI("Find my style: modern, minimal, and premium")} />
-      <Picks />
+      <LazySection>
+        <Picks />
+      </LazySection>
       <Occasions onSelectOccasion={(_, prompt) => triggerAI(prompt)} />
-      <AIExperience prefillNonce={prefillNonce} prefillPrompt={prefillPrompt} />
-      <Trending />
+      <LazySection>
+        <AIExperience prefillNonce={prefillNonce} prefillPrompt={prefillPrompt} />
+      </LazySection>
+      <LazySection>
+        <Trending />
+      </LazySection>
       <CTA onStartStyling={() => triggerAI("I need an outfit for a wedding under $150")} onTryItOn={() => router.push("/try-on")} />
     </MainLayout>
   );

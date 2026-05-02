@@ -32,6 +32,10 @@ class GeminiService {
     return true;
   }
 
+  setApiKey(_apiKey: string): void {
+    // API keys are handled by the backend proxy; keep this for legacy settings UI compatibility.
+  }
+
   /**
    * Generate intelligent response — proxied through the backend to keep API keys server-side.
    */

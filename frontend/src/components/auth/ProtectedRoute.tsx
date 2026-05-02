@@ -8,7 +8,12 @@ import { Loader2 } from 'lucide-react';
 
 // Route configuration with required roles
 const PROTECTED_ROUTES: Record<string, { roles?: AppRole[]; permissions?: string[] }> = {
+  '/analytics/admin': { roles: [AppRole.ADMIN] },
+  '/analytics/me': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
+  '/analytics/brand': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER] },
+  '/analytics/store': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER] },
   '/admin': { roles: [AppRole.ADMIN] },
+  '/ai-admin': { roles: [AppRole.ADMIN] },
   '/brand-dashboard': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER] },
   '/store-dashboard': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER] },
   '/stylist-dashboard': { roles: [AppRole.ADMIN, AppRole.STYLIST] },
@@ -16,6 +21,7 @@ const PROTECTED_ROUTES: Record<string, { roles?: AppRole[]; permissions?: string
   '/notification-analytics': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER] },
   '/security': { roles: [AppRole.ADMIN] },
   '/payment-debug': { roles: [AppRole.ADMIN] },
+  '/monitoring': { roles: [AppRole.ADMIN] },
   '/ai-stylist': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER, AppRole.STYLIST] },
   '/stylist': { roles: [AppRole.ADMIN, AppRole.BRAND_MANAGER, AppRole.STYLIST] },
   '/wardrobe': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
@@ -23,6 +29,7 @@ const PROTECTED_ROUTES: Record<string, { roles?: AppRole[]; permissions?: string
   '/profile': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
   '/wishlist': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
   '/try-on': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
+  '/try-on-live': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
   '/outfits': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
   '/cart': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
   '/checkout': { roles: [AppRole.USER, AppRole.STYLIST, AppRole.BRAND_MANAGER, AppRole.ADMIN] },
@@ -37,6 +44,7 @@ const AUTH_REQUIRED_ROUTES = [
   '/cart',
   '/checkout',
   '/try-on',
+  '/try-on-live',
   '/outfits',
   '/notifications',
   '/notification-preferences',
@@ -62,8 +70,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     if (isLoading) return;
 
     // Check if route requires authentication
-    const routeConfig = PROTECTED_ROUTES[safePathname];
-    const requiresAuth = routeConfig || AUTH_REQUIRED_ROUTES.includes(safePathname);
+    const matchedProtectedPath = Object.keys(PROTECTED_ROUTES)
+      .sort((a, b) => b.length - a.length)
+      .find((route) => safePathname === route || safePathname.startsWith(`${route}/`));
+    const routeConfig = matchedProtectedPath ? PROTECTED_ROUTES[matchedProtectedPath] : undefined;
+    const requiresAuth = routeConfig || AUTH_REQUIRED_ROUTES.some(
+      (route) => safePathname === route || safePathname.startsWith(`${route}/`)
+    );
 
     if (requiresAuth && !isAuthenticated) {
       // Redirect to login with return URL

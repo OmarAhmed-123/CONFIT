@@ -11,7 +11,7 @@ import { motion } from 'framer-motion';
 import {
     Shield, Users, ShoppingBag, DollarSign, TrendingUp, AlertTriangle,
     Settings, BarChart3, Bell, Search, Filter, Download, Eye, Ban,
-    CheckCircle, Clock, ChevronDown, Package, Store, Palette
+    CheckCircle, Clock, ChevronDown, Package, Store, Palette, Activity, Loader2
 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
@@ -28,35 +28,169 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { AppRole, useRBAC } from '@/hooks/useRBAC';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api/client';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
+import { toast } from 'sonner';
 
-// Mock admin data
-const MOCK_USERS = [
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'user', status: 'active', joined: '2024-01-15', orders: 12 },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'brand_manager', status: 'active', joined: '2024-02-20', orders: 0 },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'stylist', status: 'pending', joined: '2024-03-10', orders: 0 },
-    { id: '4', name: 'Sarah Wilson', email: 'sarah@example.com', role: 'user', status: 'suspended', joined: '2024-01-05', orders: 8 },
-];
+// Types
+interface AdminStats {
+    total_users: number;
+    total_orders: number;
+    total_revenue: number;
+    active_brands: number;
+    user_growth_percent: number;
+    order_growth_percent: number;
+    revenue_growth_percent: number;
+    brand_growth_percent: number;
+}
 
-const MOCK_ORDERS = [
-    { id: 'ORD-001', customer: 'John Doe', total: '$245.00', status: 'completed', date: '2024-04-10' },
-    { id: 'ORD-002', customer: 'Jane Smith', total: '$89.50', status: 'processing', date: '2024-04-12' },
-    { id: 'ORD-003', customer: 'Mike Johnson', total: '$156.00', status: 'pending', date: '2024-04-14' },
-];
+interface AdminUser {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: 'active' | 'pending' | 'suspended';
+    joined: string;
+    orders: number;
+}
 
-const STATS = [
-    { label: 'Total Users', value: '1,234', icon: Users, trend: '+12%', color: 'text-blue-500' },
-    { label: 'Total Orders', value: '5,678', icon: ShoppingBag, trend: '+8%', color: 'text-green-500' },
-    { label: 'Revenue', value: '$45,230', icon: DollarSign, trend: '+15%', color: 'text-purple-500' },
-    { label: 'Active Brands', value: '89', icon: Store, trend: '+5%', color: 'text-amber-500' },
-];
+interface AdminOrder {
+    id: string;
+    customer: string;
+    total: number;
+    status: string;
+    date: string;
+}
+
+const INITIAL_STATS: AdminStats = {
+    total_users: 0,
+    total_orders: 0,
+    total_revenue: 0,
+    active_brands: 0,
+    user_growth_percent: 0,
+    order_growth_percent: 0,
+    revenue_growth_percent: 0,
+    brand_growth_percent: 0,
+};
+
+function toNumber(value: unknown): number {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeAdminStats(payload: unknown): AdminStats {
+    const source = (payload && typeof payload === 'object' && 'data' in payload)
+        ? (payload as { data?: unknown }).data
+        : payload;
+    const data = source && typeof source === 'object' ? source as Record<string, unknown> : {};
+
+    return {
+        total_users: toNumber(data.total_users),
+        total_orders: toNumber(data.total_orders),
+        total_revenue: toNumber(data.total_revenue ?? data.total_revenue_egp),
+        active_brands: toNumber(data.active_brands),
+        user_growth_percent: toNumber(data.user_growth_percent),
+        order_growth_percent: toNumber(data.order_growth_percent),
+        revenue_growth_percent: toNumber(data.revenue_growth_percent),
+        brand_growth_percent: toNumber(data.brand_growth_percent),
+    };
+}
+
+function normalizeAdminUser(raw: any): AdminUser {
+    return {
+        id: String(raw?.id || ''),
+        name: String(raw?.name || raw?.email || 'User'),
+        email: String(raw?.email || ''),
+        role: String(raw?.role || 'user'),
+        status: ['active', 'pending', 'suspended'].includes(String(raw?.status))
+            ? raw.status
+            : 'active',
+        joined: String(raw?.joined || raw?.created_at || ''),
+        orders: toNumber(raw?.orders),
+    };
+}
+
+function normalizeAdminOrder(raw: any): AdminOrder {
+    return {
+        id: String(raw?.id || raw?.order_number || ''),
+        customer: String(raw?.customer || raw?.customer_name || 'Customer'),
+        total: toNumber(raw?.total),
+        status: String(raw?.status || 'processing'),
+        date: String(raw?.date || raw?.placed_at || raw?.created_at || ''),
+    };
+}
 
 export default function AdminDashboardPage() {
     const router = useRouter();
     const { user, isAuthenticated, isLoading: authLoading } = useAuth();
     const rbac = useRBAC();
+    const [hasMounted, setHasMounted] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [userFilter, setUserFilter] = useState('all');
     const canAccessDashboard = rbac.hasRole(AppRole.ADMIN);
+
+    // Real data states
+    const [stats, setStats] = useState<AdminStats>(INITIAL_STATS);
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [orders, setOrders] = useState<AdminOrder[]>([]);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+    const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
+
+    // Fetch admin data
+    useEffect(() => {
+        if (!authLoading && isAuthenticated && canAccessDashboard) {
+            fetchAdminStats();
+            fetchAdminUsers();
+            fetchAdminOrders();
+        }
+    }, [authLoading, isAuthenticated, canAccessDashboard]);
+
+    const fetchAdminStats = async () => {
+        try {
+            setIsLoadingStats(true);
+            // Use analytics admin endpoint
+            const data = await api.get<unknown>(API_ENDPOINTS.ANALYTICS.ADMIN_OVERVIEW);
+            setStats(normalizeAdminStats(data));
+        } catch (error) {
+            console.error('Failed to fetch admin stats:', error);
+            toast.error('Failed to load dashboard statistics');
+            setStats(INITIAL_STATS);
+        } finally {
+            setIsLoadingStats(false);
+        }
+    };
+
+    const fetchAdminUsers = async () => {
+        try {
+            setIsLoadingUsers(true);
+            const data = await api.get<{ users?: unknown[] }>('/api/admin/users');
+            setUsers(Array.isArray(data.users) ? data.users.map(normalizeAdminUser) : []);
+        } catch (error) {
+            console.error('Failed to fetch users:', error);
+            // Graceful fallback - don't block UI
+            setUsers([]);
+        } finally {
+            setIsLoadingUsers(false);
+        }
+    };
+
+    const fetchAdminOrders = async () => {
+        try {
+            setIsLoadingOrders(true);
+            const data = await api.get<{ orders?: unknown[] }>('/api/admin/orders');
+            setOrders(Array.isArray(data.orders) ? data.orders.map(normalizeAdminOrder) : []);
+        } catch (error) {
+            console.error('Failed to fetch orders:', error);
+            setOrders([]);
+        } finally {
+            setIsLoadingOrders(false);
+        }
+    };
 
     useEffect(() => {
         if (!authLoading && !isAuthenticated) {
@@ -69,7 +203,16 @@ export default function AdminDashboardPage() {
         }
     }, [authLoading, canAccessDashboard, isAuthenticated, router]);
 
-    if (authLoading) {
+    // Stats configuration
+    const safeStats = normalizeAdminStats(stats);
+    const STATS = [
+        { label: 'Total Users', value: safeStats.total_users.toLocaleString(), icon: Users, trend: `+${safeStats.user_growth_percent}%`, color: 'text-blue-500' },
+        { label: 'Total Orders', value: safeStats.total_orders.toLocaleString(), icon: ShoppingBag, trend: `+${safeStats.order_growth_percent}%`, color: 'text-green-500' },
+        { label: 'Revenue', value: `$${safeStats.total_revenue.toLocaleString()}`, icon: DollarSign, trend: `+${safeStats.revenue_growth_percent}%`, color: 'text-purple-500' },
+        { label: 'Active Brands', value: safeStats.active_brands.toString(), icon: Store, trend: `+${safeStats.brand_growth_percent}%`, color: 'text-amber-500' },
+    ];
+
+    if (!hasMounted || authLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin h-8 w-8 border-4 border-red-500 border-t-transparent rounded-full" />
@@ -172,18 +315,26 @@ export default function AdminDashboardPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="space-y-4">
-                                            {MOCK_USERS.slice(0, 4).map((u) => (
-                                                <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
-                                                        {u.name.split(' ').map(n => n[0]).join('')}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-medium truncate">{u.name}</div>
-                                                        <div className="text-sm text-muted-foreground truncate">{u.email}</div>
-                                                    </div>
-                                                    <Badge className={getRoleColor(u.role)}>{u.role}</Badge>
+                                            {isLoadingUsers ? (
+                                                <div className="flex items-center justify-center py-8">
+                                                    <Loader2 className="h-6 w-6 animate-spin" />
                                                 </div>
-                                            ))}
+                                            ) : users.length === 0 ? (
+                                                <p className="text-center text-muted-foreground py-8">No users found</p>
+                                            ) : (
+                                                users.slice(0, 4).map((u) => (
+                                                    <div key={u.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                                                            {u.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium truncate">{u.name}</div>
+                                                            <div className="text-sm text-muted-foreground truncate">{u.email}</div>
+                                                        </div>
+                                                        <Badge className={getRoleColor(u.role)}>{u.role}</Badge>
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
                                         <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('users')}>
                                             View All Users
@@ -201,21 +352,29 @@ export default function AdminDashboardPage() {
                                     </CardHeader>
                                     <CardContent>
                                         <div className="space-y-4">
-                                            {MOCK_ORDERS.map((order) => (
-                                                <div key={order.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                                                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
-                                                        <Package className="h-5 w-5 text-green-500" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-medium">{order.id}</div>
-                                                        <div className="text-sm text-muted-foreground">{order.customer}</div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="font-medium">{order.total}</div>
-                                                        <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                                                    </div>
+                                            {isLoadingOrders ? (
+                                                <div className="flex items-center justify-center py-8">
+                                                    <Loader2 className="h-6 w-6 animate-spin" />
                                                 </div>
-                                            ))}
+                                            ) : orders.length === 0 ? (
+                                                <p className="text-center text-muted-foreground py-8">No orders found</p>
+                                            ) : (
+                                                orders.slice(0, 4).map((order) => (
+                                                    <div key={order.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
+                                                            <Package className="h-5 w-5 text-green-500" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-medium">{order.id}</div>
+                                                            <div className="text-sm text-muted-foreground">{order.customer}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="font-medium">${order.total?.toFixed(2)}</div>
+                                                            <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
                                         <Button variant="outline" className="w-full mt-4" onClick={() => setActiveTab('orders')}>
                                             View All Orders
@@ -249,6 +408,14 @@ export default function AdminDashboardPage() {
                                                 <div className="text-sm text-muted-foreground">Pending approval for brand partnerships</div>
                                             </div>
                                             <Button size="sm" variant="outline">Review</Button>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 bg-emerald-500/10 rounded-lg">
+                                            <Activity className="h-5 w-5 text-emerald-500" />
+                                            <div className="flex-1">
+                                                <div className="font-medium">System Monitoring</div>
+                                                <div className="text-sm text-muted-foreground">Live observability & health dashboards</div>
+                                            </div>
+                                            <Button size="sm" variant="outline" onClick={() => router.push('/monitoring')}>Open</Button>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -296,44 +463,58 @@ export default function AdminDashboardPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {MOCK_USERS.map((u) => (
-                                                <TableRow key={u.id}>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
-                                                                {u.name.split(' ').map(n => n[0]).join('')}
-                                                            </div>
-                                                            <div>
-                                                                <div className="font-medium">{u.name}</div>
-                                                                <div className="text-sm text-muted-foreground">{u.email}</div>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge className={getRoleColor(u.role)}>{u.role}</Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge className={getStatusColor(u.status)}>{u.status}</Badge>
-                                                    </TableCell>
-                                                    <TableCell>{u.joined}</TableCell>
-                                                    <TableCell>{u.orders}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="sm">
-                                                                    <Eye className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem>View Profile</DropdownMenuItem>
-                                                                <DropdownMenuItem>Edit User</DropdownMenuItem>
-                                                                <DropdownMenuItem>Change Role</DropdownMenuItem>
-                                                                <DropdownMenuItem className="text-red-600">Suspend</DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                            {isLoadingUsers ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-8">
+                                                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                                                     </TableCell>
                                                 </TableRow>
-                                            ))}
+                                            ) : users.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                        No users found
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                users.map((u) => (
+                                                    <TableRow key={u.id}>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                                                                    {u.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-medium">{u.name}</div>
+                                                                    <div className="text-sm text-muted-foreground">{u.email}</div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge className={getRoleColor(u.role)}>{u.role}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge className={getStatusColor(u.status)}>{u.status}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>{u.joined}</TableCell>
+                                                        <TableCell>{u.orders}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="sm">
+                                                                        <Eye className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem>View Profile</DropdownMenuItem>
+                                                                    <DropdownMenuItem>Edit User</DropdownMenuItem>
+                                                                    <DropdownMenuItem>Change Role</DropdownMenuItem>
+                                                                    <DropdownMenuItem className="text-red-600">Suspend</DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
                                         </TableBody>
                                     </Table>
                                 </CardContent>
@@ -358,22 +539,36 @@ export default function AdminDashboardPage() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {MOCK_ORDERS.map((order) => (
-                                                <TableRow key={order.id}>
-                                                    <TableCell className="font-medium">{order.id}</TableCell>
-                                                    <TableCell>{order.customer}</TableCell>
-                                                    <TableCell>{order.total}</TableCell>
-                                                    <TableCell>
-                                                        <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                                                    </TableCell>
-                                                    <TableCell>{order.date}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="ghost" size="sm">
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
+                                            {isLoadingOrders ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-8">
+                                                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                                                     </TableCell>
                                                 </TableRow>
-                                            ))}
+                                            ) : orders.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                        No orders found
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                orders.map((order) => (
+                                                    <TableRow key={order.id}>
+                                                        <TableCell className="font-medium">{order.id}</TableCell>
+                                                        <TableCell>{order.customer}</TableCell>
+                                                        <TableCell>${order.total?.toFixed(2)}</TableCell>
+                                                        <TableCell>
+                                                            <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>{order.date}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="ghost" size="sm">
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
                                         </TableBody>
                                     </Table>
                                 </CardContent>

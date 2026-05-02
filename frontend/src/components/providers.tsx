@@ -13,6 +13,8 @@ import { CartProvider } from '@/context/CartContext';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { GenderProvider } from '@/context/GenderContext';
+import { LoadingManagerProvider } from '@/components/loading';
+import { RouteSplashController } from '@/components/loading/RouteSplashController';
 import { useState, type ReactNode } from 'react';
 
 interface ProvidersProps {
@@ -27,6 +29,8 @@ export function Providers({ children }: ProvidersProps) {
           queries: {
             staleTime: 60 * 1000, // 1 minute
             refetchOnWindowFocus: false,
+            retry: 1,
+            gcTime: 5 * 60 * 1000, // 5 minutes cache
           },
         },
       })
@@ -36,16 +40,19 @@ export function Providers({ children }: ProvidersProps) {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <CartProvider>
-            <WishlistProvider>
-              <GenderProvider>
-                <TooltipProvider>
-                  {children}
-                  <Toaster position="top-right" richColors />
-                </TooltipProvider>
-              </GenderProvider>
-            </WishlistProvider>
-          </CartProvider>
+          <LoadingManagerProvider>
+            <RouteSplashController />
+            <CartProvider>
+              <WishlistProvider>
+                <GenderProvider>
+                  <TooltipProvider>
+                    {children}
+                    <Toaster position="top-right" richColors />
+                  </TooltipProvider>
+                </GenderProvider>
+              </WishlistProvider>
+            </CartProvider>
+          </LoadingManagerProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SessionProvider>

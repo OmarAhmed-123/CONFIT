@@ -44,7 +44,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { createTransition } from '@/motion';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
@@ -396,6 +396,7 @@ function MobileNavSheet({ trigger }: { trigger: React.ReactNode }) {
     <Sheet>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl p-0">
+        <SheetTitle className="sr-only">Mobile navigation menu</SheetTitle>
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
@@ -576,12 +577,16 @@ export function PrimaryNav() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [hasMounted, setHasMounted] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { user } = useAuth();
   const { items: cartItems } = useCart();
   const { items: wishlistItems } = useWishlist();
-  const navItems = useMemo(() => buildNavItems(user), [user]);
+  const displayUser = hasMounted ? user : null;
+  const displayCartItems = hasMounted ? cartItems : [];
+  const displayWishlistItems = hasMounted ? wishlistItems : [];
+  const navItems = useMemo(() => buildNavItems(displayUser), [displayUser]);
 
   const handleMenuEnter = useCallback((id: string) => {
     setActiveMenu(id);
@@ -599,6 +604,10 @@ export function PrimaryNav() {
       setIsSearchOpen(false);
     }
   }, [searchQuery, router]);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
@@ -737,27 +746,27 @@ export function PrimaryNav() {
                 <NotificationCenter />
                 <Link href="/wishlist" className="relative p-2 rounded-full hover:bg-muted transition-colors">
                   <Heart className="h-5 w-5" />
-                  {wishlistItems.length > 0 && (
+                  {displayWishlistItems.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center">
-                      {wishlistItems.length > 9 ? '9+' : wishlistItems.length}
+                      {displayWishlistItems.length > 9 ? '9+' : displayWishlistItems.length}
                     </span>
                   )}
                 </Link>
                 <Link href="/cart" className="relative p-2 rounded-full hover:bg-muted transition-colors">
                   <ShoppingBag className="h-5 w-5" />
-                  {cartItems.length > 0 && (
+                  {displayCartItems.length > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-accent text-accent-foreground text-[10px] font-bold flex items-center justify-center">
-                      {cartItems.length > 9 ? '9+' : cartItems.length}
+                      {displayCartItems.length > 9 ? '9+' : displayCartItems.length}
                     </span>
                   )}
                 </Link>
-                {user ? (
+                {displayUser ? (
                   <Link href="/profile" className="p-2 rounded-full hover:bg-muted transition-colors">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="h-6 w-6 rounded-full object-cover" />
+                    {displayUser.avatar ? (
+                      <img src={displayUser.avatar} alt={displayUser.name} className="h-6 w-6 rounded-full object-cover" />
                     ) : (
                       <div className="h-6 w-6 rounded-full bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">{user.name?.[0]?.toUpperCase() || 'U'}</span>
+                        <span className="text-white text-xs font-bold">{displayUser.name?.[0]?.toUpperCase() || 'U'}</span>
                       </div>
                     )}
                   </Link>

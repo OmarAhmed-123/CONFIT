@@ -9,17 +9,18 @@ import os
 import secrets
 import logging
 import uuid
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-import bcrypt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database.models import User as UserModel
 from sqlalchemy.exc import IntegrityError
 from core.security.secret_bootstrap import bootstrap_secret
+from core.security.password_handler import password_handler
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ def _load_jwt_secret() -> str:
 JWT_SECRET = _load_jwt_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
+PASSWORD_RESET_EXPIRATION_MINUTES = 60
 
 
 # ── Pydantic models (API contract) ──────────────────────────────────
@@ -90,12 +92,11 @@ class AuthService:
 
     @staticmethod
     def _hash_password(password: str) -> str:
-        salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+        return password_handler.hash_password(password)
 
     @staticmethod
     def _verify_password(password: str, hashed: str) -> bool:
-        return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+        return password_handler.verify_password(password, hashed)
 
     @staticmethod
     def create_token(user_id: str, email: str) -> str:
@@ -122,6 +123,31 @@ class AuthService:
             "jti": secrets.token_hex(16),
         }
         return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    @staticmethod
+    def _password_reset_fingerprint(password_hash: str) -> str:
+        return hashlib.sha256(f"{JWT_SECRET}:{password_hash}".encode("utf-8")).hexdigest()[:32]
+
+    @staticmethod
+    def create_password_reset_token(user_id: str, email: str, password_hash: str) -> str:
+        payload = {
+            "sub": str(user_id),
+            "email": email,
+            "type": "password_reset",
+            "pwdv": AuthService._password_reset_fingerprint(password_hash),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_EXPIRATION_MINUTES),
+            "iat": datetime.now(timezone.utc),
+            "iss": "confit",
+            "jti": secrets.token_hex(16),
+        }
+        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    def create_password_reset_token_for_email(self, email: str) -> tuple[Optional[UserProfile], Optional[str]]:
+        row = self._db.query(UserModel).filter(UserModel.email == email.lower().strip()).first()
+        if not row:
+            return None, None
+        token = self.create_password_reset_token(str(row.id), row.email, row.password_hash)
+        return self._user_to_profile(row), token
 
     @staticmethod
     def decode_token(token: str) -> Optional[dict]:
@@ -196,6 +222,11 @@ class AuthService:
         - admin -> AppRole.admin (requires admin approval in production)
         """
         email_lower = email.lower().strip()
+
+        # Validate password strength
+        validation = password_handler.validate_password(password)
+        if not validation.valid:
+            return None, "; ".join(validation.errors)
 
         if self._db.query(UserModel).filter(UserModel.email == email_lower).first():
             return None, "An account with this email already exists."
@@ -337,6 +368,55 @@ class AuthService:
         new_access = self.create_token(profile.id, profile.email)
         new_refresh = self.create_refresh_token(profile.id, profile.email)
         return new_access, new_refresh
+
+    def reset_password_with_token(
+        self,
+        token: str,
+        new_password: str,
+    ) -> tuple[Optional[UserProfile], Optional[str], Optional[str], Optional[str]]:
+        """Reset a password from a short-lived signed reset token."""
+        try:
+            payload = jwt.decode(
+                token,
+                JWT_SECRET,
+                algorithms=[JWT_ALGORITHM],
+                options={"verify_exp": True},
+            )
+        except jwt.ExpiredSignatureError:
+            return None, None, None, "Reset link has expired. Please request a new one."
+        except jwt.InvalidTokenError:
+            return None, None, None, "Invalid reset link. Please request a new one."
+
+        if payload.get("type") != "password_reset":
+            return None, None, None, "Invalid reset link. Please request a new one."
+
+        user_id = str(payload.get("sub") or "")
+        email = str(payload.get("email") or "").lower().strip()
+        row = self._db.query(UserModel).filter(
+            UserModel.id == user_id,
+            UserModel.email == email,
+        ).first()
+        if not row:
+            return None, None, None, "Invalid reset link. Please request a new one."
+
+        expected_fingerprint = self._password_reset_fingerprint(row.password_hash)
+        if payload.get("pwdv") != expected_fingerprint:
+            return None, None, None, "This reset link has already been used. Please request a new one."
+
+        if len(new_password) < 12:
+            return None, None, None, "Password must be at least 12 characters."
+        if not any(c.isupper() for c in new_password):
+            return None, None, None, "Password must contain at least one uppercase letter."
+        if not any(c.isdigit() for c in new_password):
+            return None, None, None, "Password must contain at least one number."
+
+        row.password_hash = self._hash_password(new_password)
+        self._db.commit()
+        self._db.refresh(row)
+
+        access_token = self.create_token(str(row.id), row.email)
+        refresh_token = self.create_refresh_token(str(row.id), row.email)
+        return self._user_to_profile(row), access_token, refresh_token, None
 
     def get_user_by_id(self, user_id: str) -> Optional[UserProfile]:
         row = self._db.query(UserModel).filter(UserModel.id == user_id).first()

@@ -23,6 +23,7 @@ from services.auth_service import UserProfile
 from utils.auth_deps import require_auth
 
 router = APIRouter(prefix="/api/v1/analytics/brands", tags=["Brand Analytics"])
+DEFAULT_BRAND_IDS = {"default", "brand-default", "demo", "current"}
 
 
 # -----------------------------------------------------------------------------
@@ -92,23 +93,31 @@ class BrandDashboardResponse(BaseModel):
 
 def _get_brand_or_404(db: Session, brand_id: str) -> Brand:
     """Get brand or raise 404."""
-    brand = db.query(Brand).filter(Brand.id == brand_id).first()
+    if brand_id in DEFAULT_BRAND_IDS:
+        brand = db.query(Brand).order_by(Brand.name.asc()).first()
+    else:
+        brand = db.query(Brand).filter(Brand.id == brand_id).first()
     if not brand:
         raise HTTPException(status_code=404, detail="Brand not found")
     return brand
 
 
+def _event_prop(event: AnalyticsEvent, key: str, default: Any = None) -> Any:
+    props = event.properties if isinstance(event.properties, dict) else {}
+    return props.get(key, default)
+
+
 def _check_brand_access(user: UserProfile, brand: Brand, db: Session) -> None:
     """Check if user has access to brand analytics (brand_owner or admin)."""
-    user_role = db.query(UserRole).filter(UserRole.user_id == user.id).first()
+    roles = {row.role for row in db.query(UserRole).filter(UserRole.user_id == user.id).all()}
     
     # Admin has access to all brands
-    if user_role and user_role.role == AppRole.admin:
+    if AppRole.admin in roles:
         return
     
     # Brand manager must be associated with this brand
     # In a real system, there would be a brand_manager assignment table
-    if user_role and user_role.role == AppRole.brand_manager:
+    if AppRole.brand_manager in roles:
         # For now, allow access - in production, verify brand assignment
         return
     
@@ -156,6 +165,7 @@ async def get_brand_dashboard(
         - 30-day forecast
     """
     brand = _get_brand_or_404(db, brand_id)
+    brand_id = str(brand.id)
     _check_brand_access(user, brand, db)
     
     now = datetime.now(timezone.utc)
@@ -216,44 +226,51 @@ async def get_brand_dashboard(
     ]
     
     # Get midway rejections
-    rejection_events = db.query(
-        AnalyticsEvent.properties["reason_code"].label("reason_code"),
-        func.count().label("count"),
-    ).filter(
+    rejection_events = db.query(AnalyticsEvent).filter(
         AnalyticsEvent.event_name == "midway_rejection",
-        AnalyticsEvent.properties["brand_id"].astext == brand_id,
         AnalyticsEvent.timestamp >= day_30_ago,
     ).all()
-    
-    midway_rejections_count = sum(r.count for r in rejection_events)
+
+    rejection_events = [
+        event for event in rejection_events
+        if str(_event_prop(event, "brand_id", "")) == brand_id
+    ]
+
+    midway_rejections_count = len(rejection_events)
     rejection_breakdown = MidwayRejectionBreakdown()
     
-    for r in rejection_events:
-        category = _categorize_rejection_reason(str(r.reason_code))
+    for event in rejection_events:
+        category = _categorize_rejection_reason(str(_event_prop(event, "reason_code", "")))
         if category == "fabric_qa":
-            rejection_breakdown.fabric_qa += r.count
+            rejection_breakdown.fabric_qa += 1
         elif category == "stitch_qa":
-            rejection_breakdown.stitch_qa += r.count
+            rejection_breakdown.stitch_qa += 1
         elif category == "final_qa":
-            rejection_breakdown.final_qa += r.count
+            rejection_breakdown.final_qa += 1
         elif category == "size_mismatch":
-            rejection_breakdown.size_mismatch += r.count
+            rejection_breakdown.size_mismatch += 1
         elif category == "color_mismatch":
-            rejection_breakdown.color_mismatch += r.count
+            rejection_breakdown.color_mismatch += 1
     
     # Get outfit-to-purchase ratio
-    outfit_appearances = db.query(func.count()).filter(
+    outfit_events = db.query(AnalyticsEvent).filter(
         AnalyticsEvent.event_name == "outfit_saved",
-        AnalyticsEvent.properties["brand_id"].astext == brand_id,
         AnalyticsEvent.timestamp >= day_30_ago,
-    ).scalar() or 0
+    ).all()
+    outfit_appearances = sum(
+        1 for event in outfit_events
+        if str(_event_prop(event, "brand_id", "")) == brand_id
+    )
     
-    outfit_purchases = db.query(func.count()).filter(
+    purchase_events = db.query(AnalyticsEvent).filter(
         AnalyticsEvent.event_name == "order_placed",
-        AnalyticsEvent.properties["brand_id"].astext == brand_id,
-        AnalyticsEvent.properties["from_outfit"].astext == "true",
         AnalyticsEvent.timestamp >= day_30_ago,
-    ).scalar() or 0
+    ).all()
+    outfit_purchases = sum(
+        1 for event in purchase_events
+        if str(_event_prop(event, "brand_id", "")) == brand_id
+        and str(_event_prop(event, "from_outfit", "")).lower() == "true"
+    )
     
     outfit_to_purchase_ratio = (outfit_purchases / outfit_appearances) if outfit_appearances > 0 else 0.0
     
@@ -411,26 +428,22 @@ async def get_brand_rejections(
 ):
     """Get detailed midway rejection data for a brand."""
     brand = _get_brand_or_404(db, brand_id)
+    brand_id = str(brand.id)
     _check_brand_access(user, brand, db)
     
     now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
     
-    query = db.query(
-        AnalyticsEvent.properties["sku"].label("sku"),
-        AnalyticsEvent.properties["stage"].label("stage"),
-        AnalyticsEvent.properties["reason_code"].label("reason_code"),
-        AnalyticsEvent.timestamp,
-    ).filter(
+    query = db.query(AnalyticsEvent).filter(
         AnalyticsEvent.event_name == "midway_rejection",
-        AnalyticsEvent.properties["brand_id"].astext == brand_id,
         AnalyticsEvent.timestamp >= start_date,
     )
-    
-    if stage:
-        query = query.filter(AnalyticsEvent.properties["stage"].astext == stage)
-    
-    results = query.order_by(AnalyticsEvent.timestamp.desc()).limit(100).all()
+
+    results = [
+        event for event in query.order_by(AnalyticsEvent.timestamp.desc()).all()
+        if str(_event_prop(event, "brand_id", "")) == brand_id
+        and (not stage or str(_event_prop(event, "stage", "")) == stage)
+    ][:100]
     
     return {
         "brand_id": brand_id,
@@ -438,9 +451,9 @@ async def get_brand_rejections(
         "total_rejections": len(results),
         "rejections": [
             {
-                "sku": row.sku,
-                "stage": row.stage,
-                "reason_code": row.reason_code,
+                "sku": _event_prop(row, "sku"),
+                "stage": _event_prop(row, "stage"),
+                "reason_code": _event_prop(row, "reason_code"),
                 "timestamp": row.timestamp.isoformat(),
             }
             for row in results
@@ -457,6 +470,7 @@ async def get_brand_regional_sales(
 ):
     """Get regional sales breakdown for Egypt."""
     brand = _get_brand_or_404(db, brand_id)
+    brand_id = str(brand.id)
     _check_brand_access(user, brand, db)
     
     now = datetime.now(timezone.utc)

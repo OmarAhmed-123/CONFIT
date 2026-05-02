@@ -26,8 +26,8 @@ function ProductPickCard({ product, index }: { product: Product; index: number }
               "radial-gradient(700px circle at 15% 20%, rgba(139,92,246,0.25), transparent 58%), radial-gradient(600px circle at 90% 55%, rgba(59,130,246,0.16), transparent 55%)",
           }}
         />
-        <Link href={`/product/${product.id}`} className="block">
-          <div className="relative overflow-hidden rounded-2xl bg-muted">
+        <div className="relative overflow-hidden rounded-2xl bg-muted">
+          <Link href={`/product/${product.id}`} className="block">
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <img
               src={safeImageSrc(product.images?.[0])}
@@ -36,25 +36,25 @@ function ProductPickCard({ product, index }: { product: Product; index: number }
               decoding="async"
               className="w-full h-[360px] object-cover transition-transform duration-500 group-hover:scale-105"
             />
+          </Link>
 
-            {/* Hover reveal actions */}
-            <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 flex gap-2">
-              <Link
-                href="/try-on"
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-background/90 text-foreground border border-border/70 px-4 py-2 text-xs font-semibold hover:bg-background transition-colors"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                Try On
-              </Link>
-              <Link
-                href="/outfits"
-                className="inline-flex items-center justify-center rounded-full bg-accent/20 text-accent-foreground border border-white/10 px-3 py-2 text-xs font-semibold hover:bg-accent/30 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+          {/* Hover reveal actions */}
+          <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 flex gap-2">
+            <Link
+              href="/try-on"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-background/90 text-foreground border border-border/70 px-4 py-2 text-xs font-semibold hover:bg-background transition-colors"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Try On
+            </Link>
+            <Link
+              href="/outfits"
+              className="inline-flex items-center justify-center rounded-full bg-accent/20 text-accent-foreground border border-white/10 px-3 py-2 text-xs font-semibold hover:bg-accent/30 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Link>
           </div>
-        </Link>
+        </div>
 
         <div className="mt-4 flex items-start justify-between gap-3">
           <div>

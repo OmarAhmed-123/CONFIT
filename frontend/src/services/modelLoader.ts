@@ -21,14 +21,14 @@ dracoLoader.setDecoderConfig({ type: 'js' });
 
 // glTF loader with Draco support
 const gltfLoader = new GLTFLoader();
-gltfLoader.setDRACOLoader(dracoLoader);
+gltfLoader.setDRACOLoader(dracoLoader as any);
 
 // KTX2 loader for compressed textures (optional)
 let ktx2Loader: KTX2Loader | null = null;
 
 function getKTX2Loader(renderer: THREE.WebGLRenderer): KTX2Loader {
   if (!ktx2Loader) {
-    ktx2Loader = new KTX2Loader(renderer);
+    ktx2Loader = new KTX2Loader();
     ktx2Loader.setTranscoderPath('/ktx2/');
     ktx2Loader.detectSupport(renderer);
   }
@@ -155,9 +155,10 @@ export async function loadGLTFModel(
           options.onProgress(percent);
         }
       },
-      (error) => {
+      (error: unknown) => {
         console.error(`[ModelLoader] Failed to load ${url}:`, error);
-        reject(new Error(`Failed to load model: ${error.message || 'Unknown error'}`));
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        reject(new Error(`Failed to load model: ${message}`));
       }
     );
   });

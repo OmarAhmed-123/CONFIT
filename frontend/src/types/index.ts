@@ -169,8 +169,8 @@ export interface Product {
   price: number;
   currency: string;
   brand_id?: string;
-  /** API relation or plain catalog label from mocks */
-  brand?: Brand | string;
+  /** Display brand label used by shopper-facing components. */
+  brand?: string;
   brandId?: string;
   store_id?: string;
   store?: Store;

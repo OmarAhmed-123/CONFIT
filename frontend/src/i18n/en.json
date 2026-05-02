@@ -1,0 +1,222 @@
+{
+  "app": {
+    "name": "CONFIT",
+    "tagline": "Your Style, AI-Powered"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "next": "Next",
+    "previous": "Previous",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "continue": "Continue",
+    "submit": "Submit",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "yes": "Yes",
+    "no": "No",
+    "or": "Or",
+    "and": "And"
+  },
+  "auth": {
+    "login": "Log In",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "resetPassword": "Reset Password",
+    "confirmPassword": "Confirm Password",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "phoneNumber": "Phone Number",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "loginWithGoogle": "Log in with Google",
+    "signupWithGoogle": "Sign up with Google",
+    "agreeTerms": "I agree to the Terms of Service and Privacy Policy"
+  },
+  "navigation": {
+    "home": "Home",
+    "discover": "Discover",
+    "shop": "Shop",
+    "wardrobe": "My Wardrobe",
+    "mirror": "Mirror",
+    "muse": "MUSE",
+    "profile": "Profile",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "cart": "Cart",
+    "wishlist": "Wishlist",
+    "orders": "My Orders",
+    "support": "Support"
+  },
+  "home": {
+    "welcome": "Welcome to CONFIT",
+    "discoverStyle": "Discover Your Unique Style",
+    "aiPowered": "AI-Powered",
+    "featuredCollections": "Featured Collections",
+    "trendingNow": "Trending Now",
+    "newArrivals": "New Arrivals",
+    "personalizedForYou": "Personalized For You"
+  },
+  "muse": {
+    "title": "MUSE - Your AI Fashion Stylist",
+    "subtitle": "Chat with your virtual fashion assistant",
+    "startChat": "Start Chat",
+    "typeMessage": "Type your message here...",
+    "send": "Send",
+    "suggestions": "Suggestions",
+    "outfitIdeas": "Outfit Ideas",
+    "styleAdvice": "Style Advice",
+    "colorMatching": "Color Matching",
+    "occasionHelp": "Occasion Help",
+    "chatHistory": "Chat History",
+    "clearChat": "Clear Chat",
+    "thinking": "MUSE is thinking..."
+  },
+  "mirror": {
+    "title": "MIRROR - Virtual Try-On",
+    "uploadPhoto": "Upload Your Photo",
+    "selectItem": "Select Clothing Item",
+    "tryOn": "Try On",
+    "result": "Result",
+    "retake": "Retake",
+    "newTry": "New Try",
+    "tips": {
+      "title": "Tips for Best Results",
+      "goodLighting": "Ensure good lighting",
+      "clearBackground": "Clear background",
+      "fullBody": "Full body shot",
+      "frontView": "Front view"
+    }
+  },
+  "wardrobe": {
+    "title": "My Wardrobe",
+    "myItems": "My Items",
+    "addItem": "Add Item",
+    "createOutfit": "Create Outfit",
+    "outfits": "Outfits",
+    "categories": {
+      "tops": "Tops",
+      "bottoms": "Bottoms",
+      "dresses": "Dresses",
+      "outerwear": "Outerwear",
+      "shoes": "Shoes",
+      "accessories": "Accessories"
+    },
+    "empty": "Your wardrobe is empty",
+    "addFirstItem": "Add your first item",
+    "itemCount": "{count} item | {count} items"
+  },
+  "shop": {
+    "title": "Shop",
+    "filters": {
+      "title": "Filters",
+      "price": "Price",
+      "size": "Size",
+      "color": "Color",
+      "brand": "Brand",
+      "category": "Category"
+    },
+    "sortBy": "Sort By",
+    "priceLowToHigh": "Price: Low to High",
+    "priceHighToLow": "Price: High to Low",
+    "newest": "Newest",
+    "popular": "Most Popular",
+    "addToCart": "Add to Cart",
+    "outOfStock": "Out of Stock",
+    "quickView": "Quick View"
+  },
+  "product": {
+    "details": "Product Details",
+    "description": "Description",
+    "sizeGuide": "Size Guide",
+    "reviews": "Reviews",
+    "relatedProducts": "Related Products",
+    "addToWishlist": "Add to Wishlist",
+    "share": "Share",
+    "inStock": "In Stock",
+    "selectSize": "Select Size",
+    "selectColor": "Select Color"
+  },
+  "cart": {
+    "title": "Shopping Cart",
+    "empty": "Your cart is empty",
+    "continueShopping": "Continue Shopping",
+    "items": "Items",
+    "quantity": "Quantity",
+    "remove": "Remove",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "tax": "Tax",
+    "total": "Total",
+    "checkout": "Checkout",
+    "promoCode": "Promo Code",
+    "apply": "Apply"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "shippingAddress": "Shipping Address",
+    "paymentMethod": "Payment Method",
+    "orderSummary": "Order Summary",
+    "placeOrder": "Place Order",
+    "addAddress": "Add Address",
+    "cashOnDelivery": "Cash on Delivery",
+    "creditCard": "Credit Card",
+    "fawry": "Fawry",
+    "vodafoneCash": "Vodafone Cash",
+    "instaPay": "InstaPay"
+  },
+  "profile": {
+    "title": "Profile",
+    "personalInfo": "Personal Information",
+    "preferences": "Preferences",
+    "bodyMeasurements": "Body Measurements",
+    "stylePreferences": "Style Preferences",
+    "editProfile": "Edit Profile",
+    "changePhoto": "Change Photo",
+    "accountSettings": "Account Settings"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark All as Read",
+    "empty": "No notifications",
+    "types": {
+      "order": "Order",
+      "promotion": "Promotion",
+      "social": "Social",
+      "system": "System"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Connection error. Please check your internet connection.",
+    "unauthorized": "Unauthorized. Please log in.",
+    "notFound": "Page not found",
+    "validation": "Please check your input",
+    "rateLimit": "Rate limit exceeded. Please wait."
+  },
+  "footer": {
+    "about": "About CONFIT",
+    "contact": "Contact Us",
+    "careers": "Careers",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Use",
+    "social": "Follow Us",
+    "newsletter": "Newsletter",
+    "subscribe": "Subscribe"
+  }
+}

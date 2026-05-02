@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { analyticsService } from '@/services/analytics.service';
-import type { StoreDashboardData, HeatmapCell } from '@/services/analytics.service';
+import type { StoreDashboardData, HeatmapCell, TopProduct } from '@/services/analytics.service';
 import {
   KPICard, KPIGrid, ChartWrapper, VisitorHeatmap,
   TopProductsTable, EmptyState, LoadingSpinner
@@ -37,6 +37,17 @@ interface StoreAnalyticsPageProps {
   storeId?: string;
 }
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function unwrapData<T>(value: T | { data?: T }): T {
+  if (value && typeof value === 'object' && 'data' in value) {
+    return ((value as { data?: T }).data ?? value) as T;
+  }
+  return value as T;
+}
+
 export default function StoreAnalyticsPage({ storeId }: StoreAnalyticsPageProps) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -44,8 +55,8 @@ export default function StoreAnalyticsPage({ storeId }: StoreAnalyticsPageProps)
   // State
   const [dashboardData, setDashboardData] = useState<StoreDashboardData | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapCell[]>([]);
-  const [topViewed, setTopViewed] = useState<Array<{ sku: string; view_count: number }>>([]);
-  const [topPurchased, setTopPurchased] = useState<Array<{ sku: string; purchase_count: number; revenue_egp?: number }>>([]);
+  const [topViewed, setTopViewed] = useState<TopProduct[]>([]);
+  const [topPurchased, setTopPurchased] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [heatmapDays, setHeatmapDays] = useState(7);
@@ -65,13 +76,20 @@ export default function StoreAnalyticsPage({ storeId }: StoreAnalyticsPageProps)
         analyticsService.getStoreTopProducts(activeStoreId, 30, 10),
       ]);
 
-      setDashboardData(dashboard);
-      setHeatmapData(heatmap.data);
-      setTopViewed(topProducts.top_viewed);
-      setTopPurchased(topProducts.top_purchased);
+      const normalizedDashboard = unwrapData(dashboard);
+      const normalizedHeatmap = unwrapData(heatmap) as { data?: unknown };
+      const normalizedTopProducts = unwrapData(topProducts);
+
+      setDashboardData(normalizedDashboard);
+      setHeatmapData(asArray<HeatmapCell>(normalizedHeatmap?.data));
+      setTopViewed(asArray<TopProduct>(normalizedTopProducts?.top_viewed));
+      setTopPurchased(asArray<TopProduct>(normalizedTopProducts?.top_purchased));
     } catch (err) {
       console.error('Failed to fetch store analytics:', err);
       setError('Failed to load analytics data. Please try again.');
+      setHeatmapData([]);
+      setTopViewed([]);
+      setTopPurchased([]);
     } finally {
       setLoading(false);
     }

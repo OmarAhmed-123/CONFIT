@@ -22,6 +22,10 @@ export const API_ENDPOINTS = {
   // Products
   PRODUCTS: {
     LIST: '/api/products',
+    FEATURED: '/api/products/featured',
+    TRENDING: '/api/products/trending',
+    NEW_ARRIVALS: '/api/products/new-arrivals',
+    BESTSELLERS: '/api/products/bestsellers',
     DETAIL: (id: string) => `/api/products/${id}`,
     SEARCH: '/api/products/search',
     CATEGORIES: '/api/products/categories',
@@ -32,7 +36,12 @@ export const API_ENDPOINTS = {
   // Brands
   BRANDS: {
     LIST: '/api/brands',
+    FEATURED: '/api/brands/featured',
     DETAIL: (id: string) => `/api/brands/${id}`,
+    BY_SLUG: (slug: string) => `/api/brands/${slug}`,
+    DASHBOARD: (id: string) => `/api/v1/analytics/brands/${id}/dashboard`,
+    ANALYTICS: (id: string) => `/api/brands/${id}/analytics`,
+    FOLLOW: (id: string) => `/api/brands/${id}/follow`,
     PRODUCTS: (id: string) => `/api/brands/${id}/products`,
   },
 
@@ -46,6 +55,7 @@ export const API_ENDPOINTS = {
   // Cart & Checkout
   CART: {
     GET: '/api/cart',
+    ADD: '/api/cart/items',
     ADD_ITEM: '/api/cart/items',
     UPDATE_ITEM: (itemId: string) => `/api/cart/items/${itemId}`,
     REMOVE_ITEM: (itemId: string) => `/api/cart/items/${itemId}`,
@@ -74,6 +84,11 @@ export const API_ENDPOINTS = {
   WARDROBE: {
     LIST: '/api/wardrobe',
     ADD: '/api/wardrobe',
+    SUGGESTIONS: '/api/v1/closet/suggestions',
+    OUTFITS: '/api/outfits',
+    OUTFIT_DETAIL: (id: string) => `/api/outfits/${id}`,
+    CREATE_OUTFIT: '/api/outfits',
+    FAVORITE: (id: string) => `/api/wardrobe/${id}/favorite`,
     DETAIL: (id: string) => `/api/wardrobe/${id}`,
     UPDATE: (id: string) => `/api/wardrobe/${id}`,
     DELETE: (id: string) => `/api/wardrobe/${id}`,
@@ -94,6 +109,7 @@ export const API_ENDPOINTS = {
   TRY_ON: {
     PREVIEW: '/api/tryon/preview',
     RENDER: '/api/tryon',
+    GENERATE: '/api/tryon',
     STATUS: (jobId: string) => `/api/tryon/status/${jobId}`,
   },
 
@@ -104,8 +120,13 @@ export const API_ENDPOINTS = {
     OUTFIT_SUGGESTIONS: '/api/stylist/suggest',
   },
 
+  STYLIST: {
+    CHAT: '/api/stylist/chat',
+  },
+
   // Wishlist
   WISHLIST: {
+    GET: '/api/wishlist',
     LIST: '/api/wishlist',
     ADD: '/api/wishlist',
     REMOVE: (productId: string) => `/api/wishlist/${productId}`,
@@ -130,7 +151,7 @@ export const API_ENDPOINTS = {
     VOUCHER_REDEEM: '/api/care/vouchers/redeem',
     
     // Donor Dashboard
-    DONOR_DASHBOARD: '/api/care/donor/dashboard',
+    DONOR_DASHBOARD: '/api/care/dashboard',
     DONOR_CAMPAIGNS: '/api/care/donor/campaigns',
   },
 
@@ -140,6 +161,16 @@ export const API_ENDPOINTS = {
     MARK_READ: (id: string) => `/api/notifications/${id}/read`,
     MARK_ALL_READ: '/api/notifications/read-all',
     PREFERENCES: '/api/notification-preferences',
+  },
+
+  // Data Compliance (GDPR)
+  DATA_COMPLIANCE: {
+    SUMMARY: '/api/v1/me/data/summary',
+    EXPORT: '/api/v1/me/data/export',
+    EXPORT_STATUS: (exportId: string) => `/api/v1/me/data/export/${exportId}/status`,
+    DELETE: '/api/v1/me/data',
+    RETENTION_POLICIES: '/api/v1/me/data/retention-policies',
+    DPO_CONTACT: '/api/v1/me/data/dpo-contact',
   },
 
   // Analytics
@@ -199,6 +230,7 @@ export const API_ENDPOINTS = {
 
   // SNAP & STYLE — Visual Search (v1)
   VISUAL_SEARCH: {
+    SEARCH: '/api/v1/search/visual',
     BY_IMAGE: '/api/v1/search/visual',
     BY_TEXT: '/api/v1/search/text',
   },
@@ -220,6 +252,28 @@ export const API_ENDPOINTS = {
     USER_COSTS: '/api/v1/ai-admin/user-costs',
   },
 
-  // Health
+  BRAIN: {
+    TRACK_INTERACTION: '/api/ai-brain/track/interaction',
+    TRACK_OUTFIT_FEEDBACK: '/api/ai-brain/track/outfit-feedback',
+    TRACK_OCCASION: '/api/ai-brain/track/occasion',
+    TRACK_BUDGET: '/api/ai-brain/track/budget',
+    STYLE_VECTOR: '/api/ai-brain/style-vector',
+    WARDROBE_CONTEXT: '/api/ai-brain/wardrobe-context',
+    CONTEXTUAL_FACTORS: '/api/ai-brain/contextual-factors',
+    RECOMMENDATIONS: '/api/ai-brain/recommendations',
+    VALIDATE_COLORS: '/api/ai-brain/validate/colors',
+    VALIDATE_PATTERNS: '/api/ai-brain/validate/patterns',
+    VALIDATE_SILHOUETTE: '/api/ai-brain/validate/silhouette',
+    VALIDATE_OCCASION: '/api/ai-brain/validate/occasion',
+    TRENDS: '/api/ai-brain/trends',
+    TRENDS_ADAPT: '/api/ai-brain/trends/adapt',
+    CONFIDENCE_RECALCULATE: '/api/ai-brain/confidence/recalculate',
+    CONFIDENCE_BREAKDOWN: '/api/ai-brain/confidence/breakdown',
+  },
+
+  // Health & Observability
   HEALTH: '/api/health',
+  HEALTH_READY: '/api/health/ready',
+  HEALTH_DEEP: '/api/health/deep',
+  METRICS: '/api/metrics',
 } as const;

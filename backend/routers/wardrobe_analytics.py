@@ -31,6 +31,23 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/wardrobe/analytics", tags=["Wardrobe Analytics"])
 
 
+# ── Dependencies ───────────────────────────────────────────────────────
+
+def get_analytics(
+    db: Session = Depends(get_db),
+):
+    """Get WardrobeAnalyticsService (without AI brain)."""
+    return get_wardrobe_analytics_service(db)
+
+
+def get_analytics_with_ai(
+    db: Session = Depends(get_db),
+    ai_brain: AIBrainService = Depends(get_ai_brain_service),
+):
+    """Get WardrobeAnalyticsService (with AI brain)."""
+    return get_wardrobe_analytics_service(db, ai_brain)
+
+
 # ── Request Models ─────────────────────────────────────────────────────
 
 class SetSeasonRequest(BaseModel):
@@ -60,8 +77,7 @@ async def log_wear(
     data: WearLogEntry,
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
-    ai_brain: AIBrainService = Depends(get_ai_brain_service),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db, ai_brain=ai_brain: get_wardrobe_analytics_service(db, ai_brain)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics_with_ai),
 ):
     """Log a wear event for a wardrobe item."""
     result = analytics.log_wear(
@@ -77,8 +93,7 @@ async def log_wear(
 @router.get("/wear/stats")
 async def get_wear_stats(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get wear frequency statistics for user's wardrobe."""
     return analytics.get_wear_frequency_stats(user.id)
@@ -89,8 +104,7 @@ async def get_wear_stats(
 @router.get("/seasonal")
 async def get_seasonal_rotation(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get seasonal rotation status and recommendations."""
     return analytics.get_seasonal_rotation(user.id)
@@ -100,8 +114,7 @@ async def get_seasonal_rotation(
 async def set_item_season(
     data: SetSeasonRequest,
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Set seasonal classification for an item."""
     rotation = analytics.set_item_season(
@@ -125,8 +138,7 @@ async def log_outfit(
     data: OutfitHistoryCreate,
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
-    ai_brain: AIBrainService = Depends(get_ai_brain_service),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db, ai_brain=ai_brain: get_wardrobe_analytics_service(db, ai_brain)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics_with_ai),
 ):
     """Log an outfit worn by the user."""
     outfit = analytics.log_outfit(
@@ -152,8 +164,7 @@ async def get_outfit_history(
     occasion: Optional[str] = None,
     season: Optional[str] = None,
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get outfit history for user."""
     return analytics.get_outfit_history(
@@ -216,8 +227,7 @@ async def toggle_favorite(
 @router.get("/unused")
 async def get_unused_items(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get items that haven't been worn recently."""
     return analytics.get_unused_items(user.id)
@@ -228,8 +238,7 @@ async def get_unused_items(
 @router.get("/sustainability")
 async def get_sustainability_insights(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get sustainability insights for wardrobe."""
     return analytics.get_sustainability_insights(user.id)
@@ -238,8 +247,7 @@ async def get_sustainability_insights(
 @router.post("/sustainability/recalculate")
 async def recalculate_sustainability(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Recalculate sustainability metrics."""
     metrics = analytics.calculate_sustainability_metrics(user.id)
@@ -255,8 +263,7 @@ async def recalculate_sustainability(
 @router.get("/colors")
 async def analyze_colors(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Analyze color distribution in wardrobe."""
     return analytics.analyze_color_dominance(user.id)
@@ -265,8 +272,7 @@ async def analyze_colors(
 @router.get("/categories")
 async def analyze_categories(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Analyze category/style distribution in wardrobe."""
     return analytics.analyze_style_dominance(user.id)
@@ -277,8 +283,7 @@ async def analyze_categories(
 @router.get("/confidence")
 async def get_wardrobe_confidence(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get wardrobe confidence score."""
     confidence = analytics.calculate_wardrobe_confidence(user.id)
@@ -304,8 +309,7 @@ async def get_wardrobe_confidence(
 @router.get("/capsules")
 async def get_capsule_wardrobes(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Detect and get capsule wardrobes."""
     capsules = analytics.detect_capsule_wardrobes(user.id)
@@ -327,8 +331,7 @@ async def get_capsule_wardrobes(
 @router.get("/declutter")
 async def get_declutter_suggestions(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get smart declutter suggestions."""
     suggestions = analytics.generate_declutter_suggestions(user.id)
@@ -401,9 +404,7 @@ async def act_on_declutter_suggestion(
 async def check_purchase_avoidance(
     data: PurchaseCheckRequest,
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    ai_brain: AIBrainService = Depends(get_ai_brain_service),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db, ai_brain=ai_brain: get_wardrobe_analytics_service(db, ai_brain)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics_with_ai),
 ):
     """Check if user already has similar items to prevent unnecessary purchase."""
     result = analytics.check_purchase_avoidance(
@@ -421,9 +422,7 @@ async def check_purchase_avoidance(
 @router.get("/dashboard")
 async def get_full_analytics(
     user: UserProfile = Depends(require_auth),
-    db: Session = Depends(get_db),
-    ai_brain: AIBrainService = Depends(get_ai_brain_service),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db, ai_brain=ai_brain: get_wardrobe_analytics_service(db, ai_brain)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics_with_ai),
 ):
     """Get comprehensive wardrobe analytics dashboard."""
     return analytics.get_full_analytics(user.id)
@@ -435,7 +434,7 @@ async def get_full_analytics(
 async def get_ownership_signals(
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get ownership signals for AI Brain (items owned, categories, brands)."""
     from database.models import WardrobeItem
@@ -462,7 +461,7 @@ async def get_ownership_signals(
 async def get_reuse_patterns(
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get reuse pattern signals for AI Brain."""
     from models.wardrobe_analytics_models import WardrobeItemUsage
@@ -492,7 +491,7 @@ async def get_reuse_patterns(
 async def get_style_signals(
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
-    analytics: WardrobeAnalyticsService = Depends(lambda db=db: get_wardrobe_analytics_service(db)),
+    analytics: WardrobeAnalyticsService = Depends(get_analytics),
 ):
     """Get style dominance signals for AI Brain."""
     color_analysis = analytics.analyze_color_dominance(user.id)

@@ -179,27 +179,27 @@ class UserRepository(BaseRepository[UserModel, User], IUserRepository):
         pagination: Optional[PaginationParams] = None
     ) -> PaginatedResult[User]:
         """Search users by name or email."""
-        search_term = f"%{query}%"
+        search_term = f"%{query.lower()}%"
         
-        # Count query
+        # Count query - cross-database compatible (func.lower + like instead of ilike)
         count_query = select(func.count()).select_from(UserModel).where(
             or_(
-                UserModel.name.ilike(search_term),
-                UserModel.email.ilike(search_term),
-                UserModel.first_name.ilike(search_term),
-                UserModel.last_name.ilike(search_term),
+                func.lower(UserModel.name).like(search_term),
+                func.lower(UserModel.email).like(search_term),
+                func.lower(UserModel.first_name).like(search_term),
+                func.lower(UserModel.last_name).like(search_term),
             )
         )
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
         
-        # Data query
+        # Data query - cross-database compatible
         query_obj = select(UserModel).where(
             or_(
-                UserModel.name.ilike(search_term),
-                UserModel.email.ilike(search_term),
-                UserModel.first_name.ilike(search_term),
-                UserModel.last_name.ilike(search_term),
+                func.lower(UserModel.name).like(search_term),
+                func.lower(UserModel.email).like(search_term),
+                func.lower(UserModel.first_name).like(search_term),
+                func.lower(UserModel.last_name).like(search_term),
             )
         )
         

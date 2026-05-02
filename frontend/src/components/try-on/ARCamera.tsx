@@ -13,6 +13,8 @@ import {
   SwitchCamera,
   Download,
   Share2,
+  Upload,
+  Image as ImageIcon,
   Loader2,
   AlertCircle,
   Check,
@@ -38,7 +40,12 @@ import { getPrimaryProductImageUrl } from '@/lib/productImages';
 import { resolveArOverlayCategory, type ArOverlayCategory } from '@/lib/arGarmentCategory';
 import { computeBodyAnchors, smoothAnchors, type BodyAnchors } from '@/lib/realtimeTryOn/anchors';
 import { POSE_INTERVAL_MS } from '@/lib/realtimeTryOn/constants';
-import { createRealtimePoseDetector, type LoadedPoseBackend } from '@/lib/realtimeTryOn/poseDetector';
+import {
+  createRealtimePoseDetector,
+  type LoadedPoseBackend,
+  type RealtimePose,
+  type RealtimePoseDetector,
+} from '@/lib/realtimeTryOn/poseDetector';
 import { drawRealtimeWarpedGarment } from '@/lib/realtimeTryOn/drawWarpedGarment';
 
 interface Keypoint {
@@ -66,11 +73,12 @@ interface ARCameraProps {
 }
 
 function poseFromEstimate(
-  pose: import('@tensorflow-models/pose-detection').Pose,
-  video: HTMLVideoElement
+  pose: RealtimePose,
+  width: number,
+  height: number
 ): PoseResult {
-  const w = video.videoWidth;
-  const h = video.videoHeight;
+  const w = Math.max(width, 1);
+  const h = Math.max(height, 1);
   const keypoints = pose.keypoints.map((kp) => ({
     x: kp.x / w,
     y: kp.y / h,
@@ -130,14 +138,16 @@ export function ARCamera({
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
-  const detectorRef = useRef<import('@tensorflow-models/pose-detection').PoseDetector | null>(null);
+  const detectorRef = useRef<RealtimePoseDetector | null>(null);
   const poseBusyRef = useRef(false);
   const lastPoseTimeRef = useRef(0);
   const lastPoseRef = useRef<PoseResult | null>(null);
   const smoothedAnchorsRef = useRef<BodyAnchors | null>(null);
   const garmentImgRef = useRef<HTMLImageElement | null>(null);
+  const uploadedImgRef = useRef<HTMLImageElement | null>(null);
 
   // State
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -147,6 +157,9 @@ export function ARCamera({
   const [fps, setFps] = useState(0);
   const [overlayOpacity, setOverlayOpacity] = useState(85);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImageName, setUploadedImageName] = useState<string | null>(null);
+  const [isPhotoProcessing, setIsPhotoProcessing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   /** True when video element has usable dimensions (avoids 0×0 canvas / blank preview). */
@@ -156,6 +169,11 @@ export function ARCamera({
   const [poseError, setPoseError] = useState<string | null>(null);
   const [poseBackend, setPoseBackend] = useState<LoadedPoseBackend | null>(null);
   const [poseInferenceMs, setPoseInferenceMs] = useState(0);
+
+  const cameraRequiresSecureOrigin =
+    typeof window !== 'undefined' &&
+    !window.isSecureContext &&
+    !['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
 
   const garmentImage = selectedProduct ? getPrimaryProductImageUrl(selectedProduct) : null;
   const category = useMemo<ArOverlayCategory>(
@@ -202,6 +220,63 @@ export function ARCamera({
     }
   }, []);
 
+  const drawPhotoTryOn = useCallback(async (img: HTMLImageElement) => {
+    const canvas = canvasRef.current;
+    const garment = garmentImgRef.current;
+    if (!canvas || !garment) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const maxSide = 1440;
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const detector = detectorRef.current;
+    if (!detector) return;
+
+    const t0 = performance.now();
+    const poses = await detector.estimatePoses(img, { flipHorizontal: false });
+    setPoseInferenceMs(performance.now() - t0);
+
+    const pose = poses[0]
+      ? poseFromEstimate(poses[0], img.naturalWidth, img.naturalHeight)
+      : {
+          keypoints: [],
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          confidence: 0,
+          rotationAngle: 0,
+          isValid: false,
+        };
+
+    lastPoseRef.current = pose;
+    setCurrentPose(pose);
+
+    const raw = computeBodyAnchors(pose.keypoints);
+    if (raw) {
+      smoothedAnchorsRef.current = raw;
+      ctx.globalAlpha = overlayOpacity / 100;
+      drawRealtimeWarpedGarment(
+        ctx,
+        Boolean(pose.isValid),
+        raw,
+        garment,
+        garment.naturalWidth,
+        garment.naturalHeight,
+        width,
+        height,
+        category
+      );
+      ctx.globalAlpha = 1;
+    }
+  }, [category, overlayOpacity]);
+
   // FPS tracking
   const frameCountRef = useRef(0);
   const lastFpsUpdateRef = useRef(Date.now());
@@ -211,6 +286,12 @@ export function ARCamera({
     setCameraError(null);
 
     try {
+      if (cameraRequiresSecureOrigin) {
+        throw new Error(
+          `Camera access is blocked on ${window.location.hostname}. Open this page on http://localhost:3000 or serve it over HTTPS, or use Upload Photo below.`
+        );
+      }
+
       // Load pose detector
       if (!isPoseReady) {
         await loadDetector();
@@ -235,6 +316,9 @@ export function ARCamera({
       }
       const stream = await media.getUserMedia(constraints);
       streamRef.current = stream;
+      setUploadedImage(null);
+      setUploadedImageName(null);
+      uploadedImgRef.current = null;
 
       if (videoRef.current) {
         const v = videoRef.current;
@@ -258,7 +342,7 @@ export function ARCamera({
       console.error('Camera error:', err);
       setCameraError(err.message || 'Camera access denied');
     }
-  }, [isFrontCamera, isPoseReady, loadDetector]);
+  }, [cameraRequiresSecureOrigin, isFrontCamera, isPoseReady, loadDetector]);
 
   // Stop camera
   const stopCamera = useCallback(() => {
@@ -279,6 +363,73 @@ export function ARCamera({
     setIsCameraActive(false);
     setCurrentPose(null);
   }, []);
+
+  const handlePhotoUpload = useCallback(async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose a valid image file.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image is too large. Please choose an image under 10 MB.');
+      return;
+    }
+
+    setCameraError(null);
+    setIsPhotoProcessing(true);
+    try {
+      stopCamera();
+      if (!isPoseReady) {
+        await loadDetector();
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Could not load this image.'));
+        img.src = objectUrl;
+      });
+
+      if (uploadedImage?.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImage);
+      }
+      uploadedImgRef.current = img;
+      setUploadedImage(objectUrl);
+      setUploadedImageName(file.name);
+      smoothedAnchorsRef.current = null;
+      lastPoseRef.current = null;
+      await drawPhotoTryOn(img);
+      toast.success('Photo try-on ready', {
+        description: 'The selected garment was aligned locally on your uploaded photo.',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not process this photo.';
+      setCameraError(message);
+      toast.error('Photo try-on failed', { description: message });
+    } finally {
+      setIsPhotoProcessing(false);
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
+    }
+  }, [drawPhotoTryOn, isPoseReady, loadDetector, stopCamera, uploadedImage]);
+
+  const clearUploadedPhoto = useCallback(() => {
+    if (uploadedImage?.startsWith('blob:')) {
+      URL.revokeObjectURL(uploadedImage);
+    }
+    uploadedImgRef.current = null;
+    setUploadedImage(null);
+    setUploadedImageName(null);
+    setCurrentPose(null);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  }, [uploadedImage]);
 
   // Switch camera
   const switchCamera = useCallback(async () => {
@@ -345,7 +496,7 @@ export function ARCamera({
             return;
           }
 
-          const pose = poseFromEstimate(poses[0], video);
+          const pose = poseFromEstimate(poses[0], width, height);
           lastPoseRef.current = pose;
           setCurrentPose(pose);
 
@@ -409,10 +560,20 @@ export function ARCamera({
     };
   }, [isCameraActive, videoStreamReady, renderFrame]);
 
+  useEffect(() => {
+    if (!isCameraActive && uploadedImgRef.current && isGarmentLoaded) {
+      void drawPhotoTryOn(uploadedImgRef.current);
+    }
+  }, [drawPhotoTryOn, isCameraActive, isGarmentLoaded, uploadedImage]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
+      const url = uploadedImgRef.current?.src;
+      if (url?.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
     };
   }, [stopCamera]);
 
@@ -512,7 +673,7 @@ export function ARCamera({
             <span>{fps} FPS</span>
             {poseBackend && (
               <Badge variant="outline" className="text-xs font-normal">
-                {poseBackend === 'blazepose' ? 'BlazePose' : 'MoveNet'}
+                {poseBackend === 'synthetic' ? 'Fast overlay' : poseBackend}
               </Badge>
             )}
             <span className="text-xs">{poseInferenceMs.toFixed(0)} ms infer</span>
@@ -528,7 +689,7 @@ export function ARCamera({
 
       {/* Camera View */}
       <div className="relative aspect-[3/4] bg-muted rounded-xl overflow-hidden">
-        {!isCameraActive ? (
+        {!isCameraActive && !uploadedImage ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-8">
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
               <Camera className="h-10 w-10 text-primary" />
@@ -545,11 +706,19 @@ export function ARCamera({
               </div>
             )}
 
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(event) => void handlePhotoUpload(event.target.files?.[0] ?? null)}
+            />
+
             <div className="flex flex-col gap-2">
               <Button
                 variant="hero"
                 onClick={startCamera}
-                disabled={isPoseLoading}
+                disabled={isPoseLoading || isPhotoProcessing}
                 className="min-w-[200px]"
               >
                 {isPoseLoading ? (
@@ -564,6 +733,30 @@ export function ARCamera({
                   </>
                 )}
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isPoseLoading || isPhotoProcessing}
+                className="min-w-[200px]"
+              >
+                {isPhotoProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing Photo...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Photo
+                  </>
+                )}
+              </Button>
+              {cameraRequiresSecureOrigin && (
+                <p className="max-w-[260px] text-center text-xs text-muted-foreground">
+                  Camera works on <span className="font-medium">http://localhost:3000</span> or HTTPS.
+                  Photo upload works on this network URL.
+                </p>
+              )}
               {poseError && (
                 <p className="text-xs text-muted-foreground text-center">
                   Note: {poseError}. Basic camera will still work.
@@ -571,6 +764,69 @@ export function ARCamera({
               )}
             </div>
           </div>
+        ) : !isCameraActive && uploadedImage ? (
+          <>
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 h-full w-full object-contain bg-black"
+            />
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(event) => void handlePhotoUpload(event.target.files?.[0] ?? null)}
+            />
+
+            <div className="absolute left-4 top-4 rounded-lg bg-background/85 px-3 py-2 text-xs backdrop-blur-sm">
+              <div className="flex items-center gap-2 font-medium">
+                <ImageIcon className="h-3.5 w-3.5" />
+                Photo try-on
+              </div>
+              {uploadedImageName && (
+                <p className="mt-0.5 max-w-[220px] truncate text-muted-foreground">{uploadedImageName}</p>
+              )}
+            </div>
+
+            {isPhotoProcessing && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                <div className="rounded-lg bg-card px-4 py-3 text-sm shadow-lg">
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                  Aligning garment...
+                </div>
+              </div>
+            )}
+
+            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => photoInputRef.current?.click()}
+                className="bg-background/85 backdrop-blur-sm"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Change Photo
+              </Button>
+              <Button
+                variant="hero"
+                size="lg"
+                onClick={captureScreenshot}
+                disabled={isCapturing || isPhotoProcessing}
+                className="rounded-full h-14 w-14"
+              >
+                {isCapturing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Camera className="h-6 w-6" />}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={clearUploadedPhoto}
+                className="bg-background/85 backdrop-blur-sm"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+            </div>
+          </>
         ) : (
           <>
             {/* Live feed: video underlay (visible if canvas not yet sized); canvas draws video + overlay */}

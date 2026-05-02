@@ -182,9 +182,13 @@ export function useCheckoutViewModel() {
             setBnplPlan(null);
             return;
         }
+        const token = getAuthToken();
         fetch(apiUrl('/api/payments/bnpl/plan'), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({ total_amount: total, installments: 4, annual_interest_rate: 0, currency: 'USD' }),
         })
             .then((res) => (res.ok ? res.json() : null))
@@ -739,12 +743,14 @@ export function useCheckoutViewModel() {
                     });
                     if (!unifiedRes.ok) {
                         const errBody = await unifiedRes.json().catch(() => ({}));
+                        const message =
+                            typeof errBody?.detail === 'string'
+                                ? errBody.detail
+                                : `Request failed (${unifiedRes.status})`;
+                        setPaymentProviderError(message);
                         toast({
                             title: 'Paymob session failed',
-                            description:
-                                typeof errBody?.detail === 'string'
-                                    ? errBody.detail
-                                    : `Request failed (${unifiedRes.status})`,
+                            description: message,
                             variant: 'destructive',
                         });
                         return;
@@ -887,12 +893,9 @@ export function useCheckoutViewModel() {
                     cardGateway === 'stripe' &&
                     !stripeReady
                 ) {
-                    toast({
-                        title: 'Payment unavailable',
-                        description: 'Stripe is not configured. Please configure STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY on the server.',
-                        variant: 'destructive',
-                    });
-                    return;
+                    setPaymentProviderError(
+                        'No live card gateway is configured. The order was created as pending payment.'
+                    );
                 }
 
                 // ── Dispatch notifications synchronously ──

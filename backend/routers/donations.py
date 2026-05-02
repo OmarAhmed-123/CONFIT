@@ -31,6 +31,7 @@ import stripe
 from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field, validator
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from core.slowapi_limiter import limiter, LIMIT_WEBHOOK
@@ -168,17 +169,22 @@ async def get_donation_config(request: Request):
     db = SessionLocal()
     try:
         service = DonationService(db)
-        config = service.get_config()
+        try:
+            config = service.get_config()
+        except SQLAlchemyError as exc:
+            db.rollback()
+            logger.warning("Donation config table unavailable; using defaults: %s", exc)
+            config = None
         
         return DonationConfigResponse(
-            min_amount=float(config.min_donation_amount),
-            max_amount=float(config.max_donation_amount),
-            preset_amounts=config.preset_amounts or [10, 25, 50, 100],
-            enable_custom_amounts=config.enable_custom_amounts,
-            hero_title=config.hero_title or "Support the Future of Fashion",
-            hero_subtitle=config.hero_subtitle or "Your donation makes a difference.",
-            benefits=config.benefits_text or [],
-            default_expiry_days=config.default_expiry_days,
+            min_amount=float(config.min_donation_amount) if config else 1.0,
+            max_amount=float(config.max_donation_amount) if config else 10000.0,
+            preset_amounts=(config.preset_amounts if config else None) or [10, 25, 50, 100],
+            enable_custom_amounts=config.enable_custom_amounts if config else True,
+            hero_title=(config.hero_title if config else None) or "Support the Future of Fashion",
+            hero_subtitle=(config.hero_subtitle if config else None) or "Your donation makes a difference.",
+            benefits=(config.benefits_text if config else None) or [],
+            default_expiry_days=config.default_expiry_days if config else 365,
         )
     finally:
         db.close()

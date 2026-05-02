@@ -2,6 +2,7 @@
 CONFIT Backend - Metrics Collection
 ====================================
 Prometheus metrics for payment and auth operations.
+Idempotent registration for uvicorn reload compatibility.
 """
 
 from __future__ import annotations
@@ -11,78 +12,139 @@ from typing import Optional
 
 from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, REGISTRY, generate_latest
 
+
+_metrics_cache = {}
+
+
+def _get_or_create_counter(name: str, documentation: str, labelnames: list[str] = None):
+    """Get existing counter or create new one (idempotent for reloads)."""
+    cache_key = f"counter:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        metric = Counter(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
+
+
+def _get_or_create_histogram(name: str, documentation: str, labelnames: list[str] = None, buckets: list[float] = None):
+    """Get existing histogram or create new one (idempotent for reloads)."""
+    cache_key = f"histogram:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        if buckets:
+            metric = Histogram(name, documentation, labelnames, buckets=buckets)
+        else:
+            metric = Histogram(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
+
+
+def _get_or_create_gauge(name: str, documentation: str, labelnames: list[str] = None):
+    """Get existing gauge or create new one (idempotent for reloads)."""
+    cache_key = f"gauge:{name}"
+    if cache_key in _metrics_cache:
+        return _metrics_cache[cache_key]
+    labelnames = labelnames or []
+    try:
+        metric = Gauge(name, documentation, labelnames)
+        _metrics_cache[cache_key] = metric
+        return metric
+    except ValueError:
+        for collector in REGISTRY._collector_to_names.keys():
+            if hasattr(collector, '_name') and collector._name == name:
+                _metrics_cache[cache_key] = collector
+                return collector
+        raise
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # METRIC DEFINITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Payment metrics
-PAYMENT_REQUESTS = Counter(
+PAYMENT_REQUESTS = _get_or_create_counter(
     "confit_payment_requests_total",
     "Total payment requests",
     ["provider", "status"],
 )
 
-PAYMENT_AMOUNT = Histogram(
+PAYMENT_AMOUNT = _get_or_create_histogram(
     "confit_payment_amount_dollars",
     "Payment amount in dollars",
     ["provider", "currency"],
     buckets=[10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 )
 
-PAYMENT_LATENCY = Histogram(
+PAYMENT_LATENCY = _get_or_create_histogram(
     "confit_payment_latency_seconds",
     "Payment processing latency",
     ["provider", "operation"],
     buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
 )
 
-PAYMENT_ERRORS = Counter(
+PAYMENT_ERRORS = _get_or_create_counter(
     "confit_payment_errors_total",
     "Total payment errors",
     ["provider", "error_type"],
 )
 
 # Invoice metrics
-INVOICE_GENERATED = Counter(
+INVOICE_GENERATED = _get_or_create_counter(
     "confit_invoice_generated_total",
     "Total invoices generated",
     ["status"],
 )
 
-INVOICE_LATENCY = Histogram(
+INVOICE_LATENCY = _get_or_create_histogram(
     "confit_invoice_generation_seconds",
     "Invoice generation latency",
     buckets=[0.05, 0.1, 0.25, 0.5, 1.0],
 )
 
 # Auth metrics
-AUTH_REQUESTS = Counter(
+AUTH_REQUESTS = _get_or_create_counter(
     "confit_auth_requests_total",
     "Total authentication requests",
     ["type", "status"],
 )
 
-AUTH_LATENCY = Histogram(
+AUTH_LATENCY = _get_or_create_histogram(
     "confit_auth_latency_seconds",
     "Authentication latency",
     ["type"],
     buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
 )
 
-OAUTH_LOGINS = Counter(
+OAUTH_LOGINS = _get_or_create_counter(
     "confit_oauth_logins_total",
     "Total OAuth logins",
     ["provider", "status"],
 )
 
 # Order metrics
-ORDERS_CREATED = Counter(
-    "confit_orders_created_total",
+ORDERS_CREATED = _get_or_create_counter(
+    "confit_new_orders_total",
     "Total orders created",
     ["delivery_method"],
 )
 
-ORDER_VALUE = Histogram(
+ORDER_VALUE = _get_or_create_histogram(
     "confit_order_value_dollars",
     "Order value in dollars",
     ["delivery_method"],
@@ -90,13 +152,13 @@ ORDER_VALUE = Histogram(
 )
 
 # Webhook metrics
-WEBHOOK_RECEIVED = Counter(
+WEBHOOK_RECEIVED = _get_or_create_counter(
     "confit_webhook_received_total",
     "Total webhooks received",
     ["provider", "event_type"],
 )
 
-WEBHOOK_PROCESSING = Histogram(
+WEBHOOK_PROCESSING = _get_or_create_histogram(
     "confit_webhook_processing_seconds",
     "Webhook processing latency",
     ["provider"],
@@ -104,13 +166,13 @@ WEBHOOK_PROCESSING = Histogram(
 )
 
 # Celery task metrics
-CELERY_TASKS = Counter(
+CELERY_TASKS = _get_or_create_counter(
     "confit_celery_tasks_total",
     "Total Celery tasks",
     ["task", "status"],
 )
 
-CELERY_QUEUE_DEPTH = Gauge(
+CELERY_QUEUE_DEPTH = _get_or_create_gauge(
     "confit_celery_queue_depth",
     "Celery queue depth",
     ["queue"],

@@ -13,9 +13,8 @@ import { getPublicApiBaseUrl, isDev } from '@/lib/env';
 export { api, APIError } from './api/client';
 export { API_ENDPOINTS } from './api/endpoints';
 
-// In development, use same-origin relative URLs (see next.config.ts rewrites → backend).
-// In production, use NEXT_PUBLIC_API_BASE_URL when set.
-const BACKEND_URL = isDev ? '' : getPublicApiBaseUrl();
+// Use the FastAPI backend directly so backend access logs show every API request.
+const BACKEND_URL = getPublicApiBaseUrl();
 const EXPLICIT_BACKEND_URL = getPublicApiBaseUrl();
 const NEXTAUTH_RESERVED_ACTIONS = new Set([
   'callback',
@@ -34,7 +33,7 @@ function shouldUseExplicitBackend(path: string): boolean {
   }
 
   if (!path.startsWith('/api/auth/')) {
-    return !isDev;
+    return true;
   }
 
   const authAction = path.slice('/api/auth/'.length).split('/')[0];

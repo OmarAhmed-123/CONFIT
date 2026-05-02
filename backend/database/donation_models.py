@@ -433,7 +433,7 @@ class Coupon(Base):
         Index("ix_coupons_valid_from", "valid_from"),
         Index("ix_coupons_is_active", "is_active"),
         CheckConstraint("value > 0", name="ck_coupon_value_positive"),
-        CheckConstraint("code ~ '^[A-Z0-9]{4,20}$'", name="ck_coupon_code_format"),
+        CheckConstraint("length(code) BETWEEN 4 AND 20", name="ck_coupon_code_length"),
         {"extend_existing": True},
     )
 

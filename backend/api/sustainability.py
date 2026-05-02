@@ -23,7 +23,7 @@ from services.sustainability_service import (
 from models.sustainability_models import SustainabilityTierEnum, EcoBadgeEnum
 
 
-router = APIRouter(prefix="/api/sustainability", tags=["Sustainability"])
+router = APIRouter(prefix="/sustainability", tags=["Sustainability"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -11,31 +11,41 @@ from schemas.base import BaseSchema
 # ── Request Schemas ─────────────────────────────────────────────────────
 
 class ProductCreate(BaseModel):
-    """Schema for creating a product."""
+    """Schema for creating a product with Arabic localization."""
     name: str = Field(..., min_length=1, max_length=255)
+    name_ar: Optional[str] = Field(None, max_length=255, description="Arabic product name")
     description: Optional[str] = None
+    description_ar: Optional[str] = Field(None, description="Arabic description")
     category: str = Field(..., min_length=1, max_length=100)
+    category_ar: Optional[str] = Field(None, max_length=100, description="Arabic category")
     price: Decimal = Field(..., ge=0)
     brand_id: Optional[str] = None
     store_id: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=1024)
     images: Optional[List[str]] = []
     tags: Optional[List[str]] = []
+    tags_ar: Optional[List[str]] = Field(None, description="Arabic tags")
     color: Optional[str] = None
+    color_ar: Optional[str] = Field(None, max_length=50, description="Arabic color name")
     size: Optional[str] = None
     style_compatibility: Optional[int] = Field(None, ge=0, le=100)
 
 
 class ProductUpdate(BaseModel):
-    """Schema for updating a product."""
+    """Schema for updating a product with Arabic localization."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+    name_ar: Optional[str] = Field(None, max_length=255, description="Arabic product name")
     description: Optional[str] = None
+    description_ar: Optional[str] = Field(None, description="Arabic description")
     category: Optional[str] = Field(None, min_length=1, max_length=100)
+    category_ar: Optional[str] = Field(None, max_length=100, description="Arabic category")
     price: Optional[Decimal] = Field(None, ge=0)
     image_url: Optional[str] = Field(None, max_length=1024)
     images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    tags_ar: Optional[List[str]] = Field(None, description="Arabic tags")
     color: Optional[str] = None
+    color_ar: Optional[str] = Field(None, max_length=50, description="Arabic color name")
     size: Optional[str] = None
     is_active: Optional[bool] = None
     style_compatibility: Optional[int] = Field(None, ge=0, le=100)
@@ -57,18 +67,23 @@ class ProductSearchQuery(BaseModel):
 # ── Response Schemas ─────────────────────────────────────────────────────
 
 class ProductResponse(BaseSchema):
-    """Schema for product response."""
+    """Schema for product response with Arabic localization."""
     id: str
     name: str
+    name_ar: Optional[str] = None
     description: Optional[str]
+    description_ar: Optional[str] = None
     category: str
+    category_ar: Optional[str] = None
     price: float
     brand_id: Optional[str]
     store_id: Optional[str]
     image_url: Optional[str]
     images: List[str] = []
     tags: List[str] = []
+    tags_ar: Optional[List[str]] = None
     color: Optional[str]
+    color_ar: Optional[str] = None
     size: Optional[str]
     is_active: bool
     style_compatibility: int = 85

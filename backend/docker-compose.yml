@@ -207,7 +207,7 @@ services:
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -230,7 +230,8 @@ services:
       - GF_INSTALL_PLUGINS=redis-datasource
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../docs/grafana:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks:

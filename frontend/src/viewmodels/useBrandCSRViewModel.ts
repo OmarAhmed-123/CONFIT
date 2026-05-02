@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
+import { api } from '@/lib/api/client';
 
 interface Brand {
   id: string;
@@ -80,18 +81,10 @@ export const useBrandCSRViewModel = (): UseBrandCSRViewModel => {
     
     try {
       // Fetch brand CSR data
-      const response = await fetch('/api/brand/csr/stats');
-      if (response.ok) {
-        const data = await response.json();
-        setBrand(data.brand);
-        setCSRStats(data.stats);
-        setCampaigns(data.campaigns || []);
-      } else {
-        // Use mock data for development
-        setBrand(getMockBrand());
-        setCSRStats(getMockCSRStats());
-        setCampaigns(getMockCampaigns());
-      }
+      const data = await api.get<any>('/api/care/csr/stats');
+      setBrand(data.brand || getMockBrand());
+      setCSRStats(data.stats || getMockCSRStats());
+      setCampaigns(Array.isArray(data.campaigns) ? data.campaigns : []);
       
       // Fetch impact report
       setImpactReport(getMockImpactReport());

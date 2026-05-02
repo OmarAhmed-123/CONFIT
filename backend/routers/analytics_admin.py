@@ -357,7 +357,7 @@ async def get_platform_metrics(
 @router.get("/revenue")
 async def get_revenue_analytics(
     days: int = Query(30, ge=1, le=365),
-    group_by: str = Query("day", regex="^(day|week|month|store|brand)$"),
+    group_by: str = Query("day", pattern="^(day|week|month|store|brand)$"),
     user: UserProfile = Depends(require_auth),
     db: Session = Depends(get_db),
 ):

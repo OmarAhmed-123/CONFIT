@@ -37,6 +37,22 @@ interface BrandAnalyticsPageProps {
   brandId?: string;
 }
 
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function toNumber(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function unwrapData<T>(value: T | { data?: T }): T {
+  if (value && typeof value === 'object' && 'data' in value) {
+    return ((value as { data?: T }).data ?? value) as T;
+  }
+  return value as T;
+}
+
 export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
@@ -57,7 +73,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
     setError(null);
     try {
       const dashboard = await analyticsService.getBrandDashboard(activeBrandId);
-      setDashboardData(dashboard);
+      setDashboardData(unwrapData(dashboard));
     } catch (err) {
       console.error('Failed to fetch brand analytics:', err);
       setError('Failed to load analytics data. Please try again.');
@@ -153,16 +169,18 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
   const rejectionData = dashboardData?.midway_rejections_by_reason
     ? Object.entries(dashboardData.midway_rejections_by_reason).map(([name, value]) => ({
         name: name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        value,
+        value: toNumber(value),
       }))
     : [];
 
-  const forecastChartData = dashboardData?.forecast_next_30d?.map(item => ({
+  const forecastItems = asArray<NonNullable<BrandDashboardData['forecast_next_30d']>[number]>(dashboardData?.forecast_next_30d);
+  const forecastChartData = forecastItems.map(item => ({
     date: item.date,
-    predicted: item.predicted_sales,
-    lower: item.confidence_lower,
-    upper: item.confidence_upper,
-  })) || [];
+    value: toNumber(item.predicted_sales),
+    predicted: toNumber(item.predicted_sales),
+    lower: toNumber(item.confidence_lower),
+    upper: toNumber(item.confidence_upper),
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -263,7 +281,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                 loading={loading}
               >
                 <div className="space-y-3">
-                  {dashboardData?.sku_breakdown?.slice(0, 5).map((item, index) => (
+                  {asArray<NonNullable<BrandDashboardData['sku_breakdown']>[number]>(dashboardData?.sku_breakdown).slice(0, 5).map((item, index) => (
                     <motion.div
                       key={item.sku}
                       initial={{ opacity: 0, x: -10 }}
@@ -278,8 +296,8 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{item.quantity_sold}</p>
-                        <p className="text-xs text-muted-foreground">{item.revenue_egp.toLocaleString()} EGP</p>
+                        <p className="font-semibold">{toNumber(item.quantity_sold)}</p>
+                        <p className="text-xs text-muted-foreground">{toNumber(item.revenue_egp).toLocaleString()} EGP</p>
                       </div>
                     </motion.div>
                   ))}
@@ -293,7 +311,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                 loading={loading}
               >
                 <div className="space-y-3">
-                  {dashboardData?.most_styled_with?.slice(0, 5).map((item, index) => (
+                  {asArray<NonNullable<BrandDashboardData['most_styled_with']>[number]>(dashboardData?.most_styled_with).slice(0, 5).map((item, index) => (
                     <motion.div
                       key={item.product_id}
                       initial={{ opacity: 0, x: -10 }}
@@ -306,7 +324,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                         <p className="text-xs text-muted-foreground">{item.brand_name}</p>
                       </div>
                       <Badge variant="secondary">
-                        {item.styled_together_count} times
+                        {toNumber(item.styled_together_count)} times
                       </Badge>
                     </motion.div>
                   ))}
@@ -331,14 +349,14 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                   <CardTitle className="text-lg font-semibold">Return Reduction</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {dashboardData?.return_reduction_delta !== null ? (
+                  {dashboardData?.return_reduction_delta != null ? (
                     <div className="text-center py-6">
                       <div className={cn(
                         "text-4xl font-bold mb-2",
-                        dashboardData.return_reduction_delta >= 0 ? "text-green-500" : "text-red-500"
+                        toNumber(dashboardData.return_reduction_delta) >= 0 ? "text-green-500" : "text-red-500"
                       )}>
-                        {dashboardData.return_reduction_delta >= 0 ? '+' : ''}
-                        {dashboardData.return_reduction_delta}%
+                        {toNumber(dashboardData.return_reduction_delta) >= 0 ? '+' : ''}
+                        {toNumber(dashboardData.return_reduction_delta)}%
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Change in return rate vs. previous period
@@ -362,7 +380,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
               loading={loading}
             >
               <RegionalSalesChart
-                data={dashboardData?.regional_heatmap_egypt || []}
+                data={asArray<RegionalSales>(dashboardData?.regional_heatmap_egypt)}
                 loading={loading}
               />
             </ChartWrapper>
@@ -382,11 +400,11 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {dashboardData?.regional_heatmap_egypt?.map((city) => (
+                      {asArray<RegionalSales>(dashboardData?.regional_heatmap_egypt).map((city) => (
                         <TableRow key={city.city}>
                           <TableCell className="font-medium">{city.city}</TableCell>
-                          <TableCell className="text-right">{city.sales_count}</TableCell>
-                          <TableCell className="text-right">{city.revenue_egp.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{toNumber(city.sales_count)}</TableCell>
+                          <TableCell className="text-right">{toNumber(city.revenue_egp).toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -418,7 +436,7 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Total Predicted Sales</p>
                   <p className="text-2xl font-bold">
-                    {dashboardData?.forecast_next_30d?.reduce((sum, d) => sum + d.predicted_sales, 0).toLocaleString() || 0}
+                    {forecastItems.reduce((sum, d) => sum + toNumber(d.predicted_sales), 0).toLocaleString()}
                   </p>
                 </CardContent>
               </Card>
@@ -426,8 +444,8 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Avg Daily Sales</p>
                   <p className="text-2xl font-bold">
-                    {dashboardData?.forecast_next_30d
-                      ? Math.round(dashboardData.forecast_next_30d.reduce((sum, d) => sum + d.predicted_sales, 0) / 30).toLocaleString()
+                    {forecastItems.length
+                      ? Math.round(forecastItems.reduce((sum, d) => sum + toNumber(d.predicted_sales), 0) / forecastItems.length).toLocaleString()
                       : 0}
                   </p>
                 </CardContent>
@@ -436,8 +454,8 @@ export default function BrandAnalyticsPage({ brandId }: BrandAnalyticsPageProps)
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Confidence Range</p>
                   <p className="text-2xl font-bold">
-                    ±{dashboardData?.forecast_next_30d?.[0]
-                      ? Math.round((dashboardData.forecast_next_30d[0].confidence_upper - dashboardData.forecast_next_30d[0].confidence_lower) / 2)
+                    ±{forecastItems[0]
+                      ? Math.round((toNumber(forecastItems[0].confidence_upper) - toNumber(forecastItems[0].confidence_lower)) / 2)
                       : 0}
                   </p>
                 </CardContent>

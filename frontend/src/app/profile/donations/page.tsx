@@ -348,7 +348,7 @@ export default function DonorDashboardPage() {
                               {getStatusBadge(credit.status)}
                               <Button
                                 variant="ghost"
-                                size="icon-sm"
+                                size="icon"
                                 onClick={() => copyCouponCode(credit.coupon_code)}
                                 className="h-8 w-8"
                               >

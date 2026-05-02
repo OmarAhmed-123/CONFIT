@@ -8,7 +8,7 @@ Works in Egypt with proper SPF/DKIM configuration.
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from services.integrations.base import BaseIntegration, IntegrationError
 
@@ -204,41 +204,42 @@ class SendGridClient(BaseIntegration):
     async def send_template_email(
         self,
         to_email: str,
-        template_name: str,
+        template_id: str,
         template_data: Dict[str, Any],
-        template_id_override: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        from_email: Optional[str] = None,
+        from_name: Optional[str] = None,
+        language: str = "en",
+    ) -> Tuple[bool, Optional[str]]:
         """
-        Send email using a named template.
-        
+        Send dynamic template email with localization.
+
         Args:
             to_email: Recipient email
-            template_name: Template name (e.g., "order_confirmation")
-            template_data: Dynamic template data
-            template_id_override: Override template ID
-            
+            template_id: SendGrid dynamic template ID
+            template_data: Template variables
+            from_email: Sender email (optional)
+            from_name: Sender name (optional)
+            language: Language code ("en" or "ar")
+
         Returns:
-            Send result
+            (success, message_id)
         """
-        # Get template ID from env or use override
-        template_id = template_id_override or os.getenv(
-            f"SENDGRID_TEMPLATE_{template_name.upper()}",
-            ""
-        )
-        
-        if not template_id:
-            # Try to find in predefined templates
-            template_map = {
-                self.TEMPLATE_ORDER_CONFIRMATION: os.getenv("SENDGRID_TEMPLATE_ORDER_CONFIRMATION"),
-                self.TEMPLATE_DONOR_RECEIPT: os.getenv("SENDGRID_TEMPLATE_DONOR_RECEIPT"),
-                self.TEMPLATE_COUPON_REDEEMED: os.getenv("SENDGRID_TEMPLATE_COUPON_REDEEMED"),
-                self.TEMPLATE_WELCOME: os.getenv("SENDGRID_TEMPLATE_WELCOME"),
-                self.TEMPLATE_PASSWORD_RESET: os.getenv("SENDGRID_TEMPLATE_PASSWORD_RESET"),
-                self.TEMPLATE_DELIVERY_UPDATE: os.getenv("SENDGRID_TEMPLATE_DELIVERY_UPDATE"),
-            }
-            template_id = template_map.get(template_name, "")
-        
-        if not template_id:
+        # Add language preference to template data
+        template_data["language"] = language
+        template_data["is_rtl"] = language == "ar"
+
+        template_name = template_id
+        template_map = {
+            self.TEMPLATE_ORDER_CONFIRMATION: os.getenv("SENDGRID_TEMPLATE_ORDER_CONFIRMATION"),
+            self.TEMPLATE_DONOR_RECEIPT: os.getenv("SENDGRID_TEMPLATE_DONOR_RECEIPT"),
+            self.TEMPLATE_COUPON_REDEEMED: os.getenv("SENDGRID_TEMPLATE_COUPON_REDEEMED"),
+            self.TEMPLATE_WELCOME: os.getenv("SENDGRID_TEMPLATE_WELCOME"),
+            self.TEMPLATE_PASSWORD_RESET: os.getenv("SENDGRID_TEMPLATE_PASSWORD_RESET"),
+            self.TEMPLATE_DELIVERY_UPDATE: os.getenv("SENDGRID_TEMPLATE_DELIVERY_UPDATE"),
+        }
+        resolved_template_id = template_id if template_id.startswith("d-") else (template_map.get(template_name) or "")
+
+        if not resolved_template_id:
             raise IntegrationError(
                 f"Template not found: {template_name}",
                 provider="sendgrid",
@@ -247,7 +248,7 @@ class SendGridClient(BaseIntegration):
         return await self.send_email(
             to_email=to_email,
             subject="",  # Subject from template
-            template_id=template_id,
+            template_id=resolved_template_id,
             template_data=template_data,
             categories=[template_name],
         )
@@ -256,13 +257,15 @@ class SendGridClient(BaseIntegration):
         self,
         to_email: str,
         order_data: Dict[str, Any],
+        language: str = "en",
     ) -> Dict[str, Any]:
         """
-        Send order confirmation email.
+        Send localized order confirmation email.
         
         Args:
             to_email: Customer email
             order_data: Order details (number, items, total, etc.)
+            language: Language code ("en" or "ar")
             
         Returns:
             Send result
@@ -279,25 +282,30 @@ class SendGridClient(BaseIntegration):
             "delivery_method": order_data.get("delivery_method", "shipping"),
             "estimated_delivery": order_data.get("estimated_delivery", ""),
             "tracking_url": order_data.get("tracking_url", ""),
+            "language": language,
+            "is_rtl": language == "ar",
         }
         
         return await self.send_template_email(
             to_email=to_email,
             template_name=self.TEMPLATE_ORDER_CONFIRMATION,
             template_data=template_data,
+            language=language,
         )
     
     async def send_donor_receipt(
         self,
         to_email: str,
         donation_data: Dict[str, Any],
+        language: str = "en",
     ) -> Dict[str, Any]:
         """
-        Send donation receipt email.
+        Send localized donation receipt email.
         
         Args:
             to_email: Donor email
             donation_data: Donation details
+            language: Language code ("en" or "ar")
             
         Returns:
             Send result
@@ -310,12 +318,15 @@ class SendGridClient(BaseIntegration):
             "recipient_name": donation_data.get("recipient_name", ""),
             "message": donation_data.get("message", ""),
             "receipt_number": donation_data.get("receipt_number", ""),
+            "language": language,
+            "is_rtl": language == "ar",
         }
         
         return await self.send_template_email(
             to_email=to_email,
             template_name=self.TEMPLATE_DONOR_RECEIPT,
             template_data=template_data,
+            language=language,
         )
     
     async def send_coupon_redeemed(

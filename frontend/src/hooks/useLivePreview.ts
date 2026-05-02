@@ -51,9 +51,9 @@ function getWsUrl(): string {
         process.env.NODE_ENV === 'development'
             ? (() => {
                   try {
-                      return new URL(process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8001').host;
+                      return new URL(process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000').host;
                   } catch {
-                      return 'localhost:8001';
+                      return 'localhost:8000';
                   }
               })()
             : window.location.host;

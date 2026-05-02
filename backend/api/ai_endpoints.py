@@ -15,7 +15,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import (
-    APIRouter, Depends, HTTPException, UploadFile, File, 
+    APIRouter, Depends, HTTPException, Request, UploadFile, File, Form,
     BackgroundTasks, Query, Path, Body
 )
 from fastapi.responses import JSONResponse
@@ -23,9 +23,18 @@ from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from database.database import get_db
-from core.redis_client import get_redis_client
-from core.auth import get_current_user, get_current_user_id
+from database.session import get_db
+
+def get_redis_client():
+    """Stub: return None when Redis is not configured."""
+    try:
+        from core.redis_client import get_redis_client as _get
+        return _get()
+    except ImportError:
+        return None
+
+from api.deps import get_current_user
+from api.deps import get_current_user_id
 from services.ai.muse_service import MuseService
 from services.ai.mirror_service import MirrorService, TryOnRequest
 from services.ai.visual_search_service import VisualSearchService
@@ -362,6 +371,7 @@ async def wait_for_tryon(
 @visualsearch_router.post("/image", response_model=VisualSearchResponse)
 @limiter.limit("30/day")
 async def search_by_image(
+    request: Request,
     image: UploadFile = File(..., description="Query image"),
     category: Optional[str] = Query(None),
     max_price: Optional[float] = Query(None),
@@ -437,6 +447,7 @@ async def search_by_image(
 @visualsearch_router.post("/text", response_model=VisualSearchResponse)
 @limiter.limit("50/day")
 async def search_by_text(
+    request: Request,
     query: str = Body(..., embed=True),
     category: Optional[str] = Query(None),
     max_price: Optional[float] = Query(None),
@@ -493,6 +504,7 @@ async def search_by_text(
 @wardrobe_router.post("/items", response_model=WardrobeItemResponse)
 @limiter.limit("100/day")
 async def add_wardrobe_item(
+    request: Request,
     image: UploadFile = File(..., description="Item photo"),
     name: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
@@ -601,6 +613,55 @@ async def get_wardrobe_item(
     service = WardrobeService(db, redis)
     
     item = await service.get_item(item_id, user_id)
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    image_url = await service.get_image_url(item)
+    
+    return WardrobeItemResponse(
+        id=item.id,
+        name=item.name,
+        category=item.category,
+        subcategory=item.subcategory,
+        colors=item.colors,
+        patterns=item.patterns,
+        materials=item.materials,
+        tags=item.tags,
+        image_url=image_url,
+        is_favorite=item.is_favorite,
+    )
+
+
+class WardrobeItemUpdate(BaseModel):
+    """Update wardrobe item request."""
+    name: Optional[str] = None
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    colors: Optional[List[str]] = None
+    patterns: Optional[List[str]] = None
+    materials: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    is_favorite: Optional[bool] = None
+
+
+@wardrobe_router.patch("/items/{item_id}", response_model=WardrobeItemResponse)
+async def update_wardrobe_item(
+    item_id: str = Path(...),
+    updates: WardrobeItemUpdate = Body(...),
+    current_user: dict = Depends(get_current_user),
+    db = Depends(get_db),
+):
+    """Update a wardrobe item."""
+    user_id = str(current_user["id"])
+    
+    redis = get_redis_client()
+    service = WardrobeService(db, redis)
+    
+    # Convert updates to dict, excluding None values
+    update_dict = {k: v for k, v in updates.model_dump().items() if v is not None}
+    
+    item = await service.update_item(item_id, user_id, update_dict)
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

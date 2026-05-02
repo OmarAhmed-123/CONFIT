@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const SecurityDashboardPage = dynamic(
   () => import('@/pages/SecurityDashboard').then((mod) => mod.default),
@@ -8,5 +9,9 @@ const SecurityDashboardPage = dynamic(
 );
 
 export default function SecurityRoutePage() {
-  return <SecurityDashboardPage />;
+  return (
+    <ProtectedRoute>
+      <SecurityDashboardPage />
+    </ProtectedRoute>
+  );
 }

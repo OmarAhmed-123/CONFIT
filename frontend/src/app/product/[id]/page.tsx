@@ -7,31 +7,81 @@ import { MainLayout } from '@/components/layout';
 import { api, APIError } from '@/lib/api/client';
 import { API_ENDPOINTS } from '@/lib/api/endpoints';
 import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Star, Truck, Shield, RefreshCw, MapPinned, MessageCircle, Radio, Users } from 'lucide-react';
+import { toast } from 'sonner';
+import { safeImageSrc } from '@/lib/imageFallback';
+import type { Product as CatalogProduct } from '@/types';
 
-interface Product {
+interface ProductApi {
   id: string;
   name: string;
   description: string;
   price: number;
   original_price?: number;
+  originalPrice?: number;
   images: string[];
+  image_url?: string;
   category: string;
-  brand: string;
+  brand?: string | { name?: string };
   brand_id?: string;
+  brandId?: string;
   sizes?: string[];
+  size?: string;
   colors?: string[];
+  color?: string;
   in_stock: boolean;
+  inStock?: boolean;
+  gender?: CatalogProduct['gender'];
   rating?: number;
   reviews_count?: number;
+}
+
+function normalizeProduct(data: ProductApi): ProductApi {
+  const images = Array.isArray(data.images)
+    ? data.images.filter(Boolean)
+    : data.image_url
+      ? [data.image_url]
+      : [];
+  return {
+    ...data,
+    images,
+    sizes: Array.isArray(data.sizes) && data.sizes.length ? data.sizes : data.size ? [data.size] : ['M'],
+    colors: Array.isArray(data.colors) && data.colors.length ? data.colors : data.color ? [data.color] : ['Default'],
+    in_stock: data.in_stock ?? data.inStock ?? true,
+    original_price: data.original_price ?? data.originalPrice,
+  };
+}
+
+function toCartProduct(product: ProductApi): CatalogProduct {
+  const brandName = typeof product.brand === 'string' ? product.brand : product.brand?.name;
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    category: product.category,
+    price: Number(product.price || 0),
+    currency: 'USD',
+    brand: brandName || '',
+    brand_id: product.brand_id,
+    brandId: product.brandId ?? product.brand_id,
+    images: product.images,
+    image_url: product.images[0],
+    colors: product.colors,
+    sizes: product.sizes,
+    inStock: product.in_stock,
+    originalPrice: product.original_price,
+    gender: product.gender ?? 'unisex',
+  };
 }
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
-  const [product, setProduct] = useState<Product | null>(null);
+  const { addToCart } = useCart();
+  const [product, setProduct] = useState<ProductApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string>('');
@@ -42,7 +92,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const data = await api.get<Product>(API_ENDPOINTS.PRODUCTS.DETAIL(productId));
+        const data = normalizeProduct(await api.get<ProductApi>(API_ENDPOINTS.PRODUCTS.DETAIL(productId)));
         setProduct(data);
         if (data.sizes?.length) setSelectedSize(data.sizes[0]);
         if (data.colors?.length) setSelectedColor(data.colors[0]);
@@ -64,11 +114,20 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push(`/login?redirect=${encodeURIComponent(`/product/${productId}`)}`);
       return;
     }
-    // TODO: Implement cart functionality
-    console.log('Add to cart:', { product: product?.id, size: selectedSize, color: selectedColor, quantity });
+    if (!product) return;
+    addToCart(
+      toCartProduct(product),
+      quantity,
+      selectedSize || product.sizes?.[0] || 'One Size',
+      selectedColor || product.colors?.[0] || 'Default'
+    );
+    toast.success('Added to cart', {
+      description: `${product.name} is ready for checkout.`,
+    });
+    router.push('/cart');
   };
 
   if (loading) {
@@ -100,6 +159,7 @@ export default function ProductDetailPage() {
     : 0;
   const socialProofCount = Math.max(product.reviews_count || 0, 24);
   const liveViewerCount = Math.max(Math.round((product.rating || 4.5) * 16), 18);
+  const brandName = typeof product.brand === 'string' ? product.brand : product.brand?.name || 'CONFIT';
 
   return (
     <MainLayout>
@@ -118,8 +178,8 @@ export default function ProductDetailPage() {
           <div className="space-y-4">
             <div className="aspect-square rounded-2xl overflow-hidden bg-muted">
               {product.images?.[0] ? (
-                <img 
-                  src={product.images[0]} 
+                <img
+                  src={safeImageSrc(product.images[0])}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />
@@ -133,7 +193,7 @@ export default function ProductDetailPage() {
               <div className="grid grid-cols-4 gap-2">
                 {product.images.slice(1, 5).map((img, idx) => (
                   <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-muted cursor-pointer hover:ring-2 hover:ring-accent">
-                    <img src={img} alt={`${product.name} ${idx + 2}`} className="w-full h-full object-cover" />
+                    <img src={safeImageSrc(img)} alt={`${product.name} ${idx + 2}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
@@ -143,7 +203,7 @@ export default function ProductDetailPage() {
           {/* Product Info */}
           <div className="space-y-6">
             <div>
-              <p className="text-sm text-accent font-medium mb-2">{product.brand}</p>
+              <p className="text-sm text-accent font-medium mb-2">{brandName}</p>
               <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
             </div>
 
@@ -296,13 +356,13 @@ export default function ProductDetailPage() {
                   </Link>
                 </Button>
                 <Button variant="outline" className="justify-start" asChild>
-                  <Link href={`/stores?search=${encodeURIComponent(product.brand)}`}>
+                  <Link href={`/stores?search=${encodeURIComponent(brandName)}`}>
                     <MessageCircle className="mr-2 h-4 w-4 text-emerald-600" />
                     WhatsApp / Call Store
                   </Link>
                 </Button>
                 <Button variant="outline" className="justify-start" asChild>
-                  <Link href={`/stores?search=${encodeURIComponent(product.brand)}`}>
+                  <Link href={`/stores?search=${encodeURIComponent(brandName)}`}>
                     <MapPinned className="mr-2 h-4 w-4 text-blue-600" />
                     Store Locator
                   </Link>
@@ -312,7 +372,7 @@ export default function ProductDetailPage() {
               <div className="rounded-xl border border-border/70 bg-white/70 p-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium">{product.brand} live now</p>
+                    <p className="font-medium">{brandName} live now</p>
                     <p className="text-muted-foreground">New arrivals, sizing walkthroughs, and pickup support.</p>
                   </div>
                   <span className="text-sm font-semibold text-rose-600">{liveViewerCount} viewing</span>

@@ -139,12 +139,30 @@ export default function Register() {
             return;
         }
 
+        const normalizedEmail = formData.email.trim().toLowerCase();
+        if (!normalizedEmail) {
+            setError('Please enter a valid email address');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
+            const existsResponse = await fetch(
+                apiUrl(`/api/auth/exists?email=${encodeURIComponent(normalizedEmail)}`)
+            );
+            if (existsResponse.ok) {
+                const existsData = await existsResponse.json();
+                if (existsData?.exists) {
+                    setError('This email is already registered. Please login directly.');
+                    router.push(`/login?email=${encodeURIComponent(normalizedEmail)}`);
+                    return;
+                }
+            }
+
             const payload: Record<string, unknown> = {
                 name: formData.name,
-                email: formData.email,
+                email: normalizedEmail,
                 password: formData.password,
                 user_type: selectedType,
                 date_of_birth: formData.dateOfBirth || undefined,
@@ -196,18 +214,7 @@ export default function Register() {
                 setError(errData?.detail || 'Registration failed. Please try again.');
             }
         } catch {
-            // Fallback - backend not running, allow demo navigation
-            localStorage.setItem('confit_user', JSON.stringify({
-                name: formData.name,
-                email: formData.email,
-                user_type: selectedType,
-            }));
-            sessionStorage.setItem('confit_auth_success', JSON.stringify({
-                type: 'registration',
-                userName: formData.name,
-                timestamp: Date.now(),
-            }));
-            router.push('/');
+            setError('Unable to complete registration right now. Please try again in a moment.');
         } finally {
             setIsLoading(false);
         }

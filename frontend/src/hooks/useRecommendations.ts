@@ -329,7 +329,8 @@ export function useRecommendations({
   useEffect(() => {
     if (storeId && !abAssignment) {
       fetchApi(`/api/v1/alert-recommendations/ab-test/assignment/${storeId}`)
-        .then((data: { assigned: boolean; group?: string; experiment_id?: string }) => {
+        .then((raw) => {
+          const data = raw as { assigned: boolean; group?: string; experiment_id?: string };
           if (data.assigned && data.group && data.experiment_id) {
             setABAssignment(storeId, {
               id: '',
@@ -413,7 +414,8 @@ export function useABTestInfo(storeId: string) {
   useEffect(() => {
     if (abAssignment?.experiment_id) {
       fetchApi(`/api/v1/alert-recommendations/ab-test/experiment`)
-        .then((data: { active: boolean; experiment?: { id: string; name: string; is_active: boolean } }) => {
+        .then((raw) => {
+          const data = raw as { active: boolean; experiment?: { id: string; name: string; is_active: boolean } };
           if (data.active && data.experiment) {
             setExperiment({
               id: data.experiment.id,

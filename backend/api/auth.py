@@ -42,18 +42,18 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 )
 @limiter.limit(LIMIT_AUTH_ENDPOINT)
 async def register(
-    request: RegisterRequest,
-    http_request: Request,
+    request: Request,
+    payload: RegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Register a new user account and return tokens for auto-login."""
     user, error = await auth_service.register(
-        email=request.email,
-        password=request.password,
-        name=request.name,
-        first_name=request.first_name,
-        last_name=request.last_name,
-        phone=request.phone,
+        email=payload.email,
+        password=payload.password,
+        name=payload.name,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        phone=payload.phone,
     )
     
     if error:
@@ -74,8 +74,8 @@ async def register(
     # Update last login
     await auth_service.user_repository.update_last_login(
         user_id=user.id,
-        ip_address=http_request.client.host if http_request.client else "",
-        user_agent=http_request.headers.get("user-agent", ""),
+        ip_address=request.client.host if request.client else "",
+        user_agent=request.headers.get("user-agent", ""),
     )
     
     return LoginResponse(
@@ -94,17 +94,17 @@ async def register(
 )
 @limiter.limit(LIMIT_AUTH_ENDPOINT)
 async def login(
-    request: LoginRequest,
-    http_request: Request,
+    request: Request,
+    payload: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Authenticate user and return tokens."""
     response, error = await auth_service.login(
-        email=request.email,
-        password=request.password,
-        device_id=request.device_id,
-        ip_address=http_request.client.host if http_request.client else None,
-        user_agent=http_request.headers.get("user-agent"),
+        email=payload.email,
+        password=payload.password,
+        device_id=payload.device_id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
     )
     
     if error:
@@ -123,7 +123,7 @@ async def login(
 )
 @limiter.limit(LIMIT_AUTH_ENDPOINT)
 async def login_form(
-    http_request: Request,
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service),
 ):
@@ -131,8 +131,8 @@ async def login_form(
     response, error = await auth_service.login(
         email=form_data.username,
         password=form_data.password,
-        ip_address=http_request.client.host if http_request.client else None,
-        user_agent=http_request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
     )
     
     if error:
@@ -276,11 +276,12 @@ async def change_password(
 )
 @limiter.limit(LIMIT_AUTH_ENDPOINT)
 async def request_password_reset(
-    request: ResetPasswordRequest,
+    request: Request,
+    payload: ResetPasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Request password reset email."""
-    await auth_service.request_password_reset(request.email)
+    await auth_service.request_password_reset(payload.email)
     
     # Always return success to prevent email enumeration
     return {"message": "If the email exists, a reset link has been sent"}
@@ -292,13 +293,14 @@ async def request_password_reset(
 )
 @limiter.limit(LIMIT_AUTH_ENDPOINT)
 async def confirm_password_reset(
-    request: ResetPasswordConfirmRequest,
+    request: Request,
+    payload: ResetPasswordConfirmRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ):
     """Confirm password reset with token."""
     success, error = await auth_service.confirm_password_reset(
-        token=request.token,
-        new_password=request.new_password,
+        token=payload.token,
+        new_password=payload.new_password,
     )
     
     if error:

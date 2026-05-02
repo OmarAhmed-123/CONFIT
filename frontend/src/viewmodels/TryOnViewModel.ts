@@ -73,6 +73,25 @@ function makeFallbackGarmentDataUri(garmentName: string, garmentCategory?: strin
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+async function readJsonResponse(response: Response): Promise<any> {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (!text) return {};
+    if (!contentType.includes('application/json')) {
+        const snippet = text.trim().slice(0, 80);
+        throw new Error(
+            snippet.startsWith('<')
+                ? `Expected JSON from ${response.url || 'server'}, but received an HTML page.`
+                : `Expected JSON from ${response.url || 'server'}, but received ${contentType || 'unknown content'}.`
+        );
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error('The server returned an invalid JSON response.');
+    }
+}
+
 /* ── Backend MCP try-on ───────────────────────────────────────── */
 
 async function processViaBackend(
@@ -99,7 +118,7 @@ async function processViaBackend(
             signal: controller.signal,
         });
 
-        const envelope = await response.json();
+        const envelope = await readJsonResponse(response);
         if (!response.ok) {
             const detail = envelope?.detail || envelope || {};
             const err = new Error(
@@ -144,7 +163,7 @@ async function processPreviewViaBackend(
             signal: controller.signal,
         });
 
-        const envelope = await response.json();
+        const envelope = await readJsonResponse(response);
         if (!response.ok) {
             const detail = envelope?.detail || envelope || {};
             const err = new Error(
@@ -190,7 +209,7 @@ export function useTryOnViewModel() {
         const maxAttempts = Math.max(1, Math.floor(maxWaitMs / pollMs));
         for (let i = 0; i < maxAttempts; i += 1) {
             const res = await fetch(apiUrl(`/api/tryon/render/${jobId}`));
-            const envelope = await res.json().catch(() => ({}));
+            const envelope = await readJsonResponse(res).catch(() => ({}));
             if (!res.ok || envelope?.success === false) {
                 throw new Error('Could not read render job status.');
             }
@@ -234,7 +253,7 @@ export function useTryOnViewModel() {
 
         try {
             const diagRes = await fetch(apiUrl('/api/virtual-tryon/diagnostics'));
-            const diagEnvelope = await diagRes.json().catch(() => ({}));
+            const diagEnvelope = await readJsonResponse(diagRes).catch(() => ({}));
             const diag = diagEnvelope?.data ?? diagEnvelope;
             const finalAvailable = Boolean(diag?.final_render_available);
 

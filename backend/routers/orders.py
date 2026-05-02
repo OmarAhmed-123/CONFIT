@@ -266,6 +266,41 @@ async def update_order_status(
     }
 
 
+@router.post("/{order_id}/cancel")
+async def cancel_order(
+    order_id: str,
+    user: UserProfile = Depends(require_auth),
+    order_service: OrderService = Depends(get_order_service),
+):
+    """Compatibility endpoint for frontend cancel actions."""
+    updated = order_service.update_status(
+        user_id=user.id,
+        order_id=order_id,
+        status="cancelled",
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"success": True, "order": updated}
+
+
+@router.get("/{order_id}/track")
+async def track_order(
+    order_id: str,
+    user: UserProfile = Depends(require_auth),
+    order_service: OrderService = Depends(get_order_service),
+):
+    """Return the tracking information used by shopper order pages."""
+    order = order_service.get_order_by_id(user.id, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {
+        "success": True,
+        "tracking_number": order.get("tracking_number"),
+        "estimated_delivery": order.get("estimated_delivery"),
+        "status": order.get("status"),
+    }
+
+
 @router.post("/{order_id}/returns")
 async def create_return_request(
     order_id: str,

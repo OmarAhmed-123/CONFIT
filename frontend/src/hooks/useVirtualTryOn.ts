@@ -44,6 +44,24 @@ function detectCategoryFromName(name: string): string {
     return 'tops';
 }
 
+async function readJsonResponse(response: Response): Promise<any> {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (!text) return {};
+    if (!contentType.includes('application/json')) {
+        throw new Error(
+            text.trim().startsWith('<')
+                ? 'Try-on endpoint returned an HTML page instead of JSON. Please check the API URL.'
+                : `Try-on endpoint returned ${contentType || 'unknown content'} instead of JSON.`
+        );
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        throw new Error('Try-on endpoint returned invalid JSON.');
+    }
+}
+
 export function useVirtualTryOn() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [resultImage, setResultImage] = useState<string | null>(null);
@@ -77,8 +95,9 @@ export function useVirtualTryOn() {
                 signal: controller.signal,
             });
 
+            const envelope = await readJsonResponse(response);
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+                const errorData = envelope ?? {};
                 const detail = errorData.detail;
                 const msg =
                     typeof detail === 'string'
@@ -89,7 +108,6 @@ export function useVirtualTryOn() {
                 throw new Error(msg || `Server error: ${response.status}`);
             }
 
-            const envelope = await response.json();
             const data: TryOnResult = envelope?.data ?? envelope;
 
             if (!data?.success || !data?.resultImage) {

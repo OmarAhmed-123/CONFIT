@@ -87,10 +87,10 @@ export function OutfitCard({
             <div
               className={cn(
                 "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-md",
-                budgetStatusClass(remaining)
+                budgetStatusClass(remaining ?? 0)
               )}
             >
-              {remaining >= 0 ? "Within budget" : "Over budget"}
+              {(remaining ?? 0) >= 0 ? "Within budget" : "Over budget"}
             </div>
           )}
         </div>

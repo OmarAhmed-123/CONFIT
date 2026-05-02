@@ -20,7 +20,7 @@ from api.deps import get_db, get_current_user, get_current_user_id
 from core.security.rbac import AuthContext, Role
 
 
-router = APIRouter(prefix="/alert-rules", tags=["Alert Rules Configuration"])
+router = APIRouter(prefix="/api/alert-rules", tags=["Alert Rules Configuration"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

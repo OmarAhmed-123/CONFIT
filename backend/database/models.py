@@ -706,10 +706,15 @@ class Product(Base):
 
     id                  = Column(UUIDType, primary_key=True, default=_new_uuid)
     name                = Column(String(255), nullable=False)
+    name_ar             = Column(String(255), nullable=True)  # Arabic product name
     description         = Column(Text, nullable=True)
+    description_ar      = Column(Text, nullable=True)  # Arabic description
     category            = Column(String(100), nullable=False)
+    category_ar         = Column(String(100), nullable=True)  # Arabic category
     subcategory         = Column(String(100), nullable=True)
+    subcategory_ar      = Column(String(100), nullable=True)  # Arabic subcategory
     color               = Column(String(50), nullable=True)
+    color_ar            = Column(String(50), nullable=True)  # Arabic color name
     size                = Column(String(20), nullable=True)
     price               = Column(Float, nullable=False)
     # brand_id is String(64) because Brand.id is a string slug (e.g. "brand-luxelayers")
@@ -717,6 +722,7 @@ class Product(Base):
     store_id            = Column(UUIDType, ForeignKey("stores.id"), nullable=True)
     image_url           = Column(String(1024), nullable=True)
     tags                = Column(JSON, nullable=True)
+    tags_ar             = Column(JSON, nullable=True)  # Arabic tags
     style_compatibility = Column(Integer, nullable=True, default=85)
     is_active           = Column(Boolean, nullable=False, default=True)
     created_at          = Column(DateTime(timezone=True), nullable=False,
@@ -1522,7 +1528,7 @@ class DonationCampaign(Base):
     donor = relationship("User", backref="donation_campaigns")
     beneficiaries = relationship("CampaignBeneficiary", back_populates="campaign",
                                  cascade="all, delete-orphan")
-    vouchers = relationship("CareVoucher", back_populates="campaign",
+    vouchers = relationship("DonationVoucher", back_populates="campaign",
                             cascade="all, delete-orphan")
 
 
@@ -1563,15 +1569,15 @@ class CampaignBeneficiary(Base):
 
     # Relationships
     campaign = relationship("DonationCampaign", back_populates="beneficiaries")
-    vouchers = relationship("CareVoucher", back_populates="beneficiary")
+    vouchers = relationship("DonationVoucher", back_populates="beneficiary")
 
 
-class CareVoucher(Base):
+class DonationVoucher(Base):
     """
     A voucher that can be used by beneficiaries to shop.
     Vouchers have a code that can be applied at checkout.
     """
-    __tablename__ = "care_vouchers"
+    __tablename__ = "donation_vouchers"
     __table_args__ = {"extend_existing": True}
 
     id = Column(UUIDType, primary_key=True, default=_new_uuid)
@@ -1616,7 +1622,7 @@ class VoucherTransaction(Base):
     __table_args__ = {"extend_existing": True}
 
     id = Column(UUIDType, primary_key=True, default=_new_uuid)
-    voucher_id = Column(UUIDType, ForeignKey("care_vouchers.id"),
+    voucher_id = Column(UUIDType, ForeignKey("donation_vouchers.id"),
                         nullable=False, index=True)
 
     # Transaction details
@@ -1636,7 +1642,7 @@ class VoucherTransaction(Base):
                         default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    voucher = relationship("CareVoucher", back_populates="transactions")
+    voucher = relationship("DonationVoucher", back_populates="transactions")
 
 
 class DonationTransaction(Base):
@@ -1786,3 +1792,23 @@ class DailyUserSummary(Base):
 
 # Payment ledger + invoices (Stripe / Paymob / PayPal) -- register models with same Base metadata
 from database.payment_platform_models import Payment, PaymentTransaction, PaymentEvent, Invoice  # noqa: E402,F401
+
+
+# ── Security Audit Log ──────────────────────────────────────────────────────
+
+class SecurityAuditLog(Base):
+    """Persistent security audit log for all sensitive actions."""
+
+    __tablename__ = "security_audit_log"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(UUIDType, primary_key=True, default=_new_uuid)
+    event_type = Column(String(64), nullable=False, index=True)
+    actor_id = Column(String(255), nullable=True, index=True)
+    target_id = Column(String(255), nullable=True, index=True)
+    ip_address = Column(String(64), nullable=True)
+    user_agent = Column(String(512), nullable=True)
+    outcome = Column(String(20), nullable=False, default="success")
+    details = Column(JSON, nullable=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False,
+                       default=lambda: datetime.now(timezone.utc))

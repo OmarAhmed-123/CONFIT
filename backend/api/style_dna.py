@@ -30,7 +30,7 @@ from models.style_dna_models import (
 )
 
 
-router = APIRouter(prefix="/style-dna", tags=["Style DNA"])
+router = APIRouter(prefix="/api/style-dna", tags=["Style DNA"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

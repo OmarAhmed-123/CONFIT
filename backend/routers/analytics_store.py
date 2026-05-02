@@ -23,6 +23,7 @@ from utils.auth_deps import require_auth
 from utils.rbac import require_role
 
 router = APIRouter(prefix="/api/v1/analytics/stores", tags=["Store Analytics"])
+DEFAULT_STORE_IDS = {"default", "store-default", "demo", "current"}
 
 
 # -----------------------------------------------------------------------------
@@ -87,7 +88,11 @@ class HeatmapResponse(BaseModel):
 
 def _get_store_or_404(db: Session, store_id: str) -> Store:
     """Get store or raise 404."""
-    store = db.query(Store).filter(Store.id == store_id).first()
+    store = None
+    if store_id in DEFAULT_STORE_IDS:
+        store = db.query(Store).order_by(Store.name.asc()).first()
+    else:
+        store = db.query(Store).filter(Store.id == store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
     return store
@@ -153,6 +158,7 @@ async def get_store_dashboard(
         - Coupon metrics
     """
     store = _get_store_or_404(db, store_id)
+    store_id = str(store.id)
     _check_store_access(user, store, db)
     
     now = datetime.now(timezone.utc)
@@ -370,6 +376,7 @@ async def get_store_heatmap(
     useful for staffing optimization.
     """
     store = _get_store_or_404(db, store_id)
+    store_id = str(store.id)
     _check_store_access(user, store, db)
     
     now = datetime.now(timezone.utc)
@@ -396,32 +403,23 @@ async def get_store_heatmap(
         
         return HeatmapResponse(store_id=store_id, data=cells)
     
-    # Fallback to database query
-    query = text("""
-        SELECT
-            EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Africa/Cairo') as hour,
-            EXTRACT(DOW FROM timestamp AT TIME ZONE 'Africa/Cairo') as day_of_week,
-            COUNT(*) as visitor_count
-        FROM analytics_events
-        WHERE store_id = :store_id
-        AND event_name = 'store_visited'
-        AND timestamp >= :start_date
-        GROUP BY hour, day_of_week
-        ORDER BY day_of_week, hour
-    """)
-    
-    results = db.execute(query, {
-        "store_id": store_id,
-        "start_date": start_date,
-    }).all()
-    
+    events = db.query(AnalyticsEvent.timestamp).filter(
+        AnalyticsEvent.store_id == store_id,
+        AnalyticsEvent.event_name == "store_visited",
+        AnalyticsEvent.timestamp >= start_date,
+    ).all()
+
+    counts: Dict[tuple[int, int], int] = {}
+    for (timestamp,) in events:
+        if not timestamp:
+            continue
+        day_of_week = timestamp.weekday()
+        hour = timestamp.hour
+        counts[(day_of_week, hour)] = counts.get((day_of_week, hour), 0) + 1
+
     cells = [
-        HeatmapCell(
-            hour=int(row.hour),
-            day_of_week=int(row.day_of_week),
-            visitor_count=int(row.visitor_count),
-        )
-        for row in results
+        HeatmapCell(hour=hour, day_of_week=day, visitor_count=count)
+        for (day, hour), count in sorted(counts.items())
     ]
     
     return HeatmapResponse(store_id=store_id, data=cells)
@@ -437,6 +435,7 @@ async def get_store_top_products(
 ):
     """Get top products by views and purchases for a store."""
     store = _get_store_or_404(db, store_id)
+    store_id = str(store.id)
     _check_store_access(user, store, db)
     
     now = datetime.now(timezone.utc)

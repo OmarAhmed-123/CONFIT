@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from database.session import SessionLocal
 from database.models import Order as OrderModel
-from database.payment_platform_models import Invoice, Payment, PaymentEvent
+from database.payment_platform_models import Invoice, Payment, PaymentEvent, PaymentStatus
 from services.auth_service import UserProfile
 from services.payment_platform.event_bus import bus
 from services.payment_platform import orchestrator as orch
@@ -111,6 +111,11 @@ async def create_unified_session(
         if code.startswith("STRIPE_ERROR:"):
             raise HTTPException(502, code) from e
         if code.startswith("PAYMOB_ERROR:"):
+            if "403 Forbidden" in code or "401 Unauthorized" in code:
+                raise HTTPException(
+                    503,
+                    "Paymob credentials were rejected. Check PAYMOB_API_KEY, integration id, iframe id, and account mode before retrying.",
+                ) from e
             raise HTTPException(502, code) from e
         if code.startswith("PAYPAL_ERROR:"):
             raise HTTPException(502, code) from e
@@ -176,7 +181,10 @@ async def webhook_paymob(request: Request, db: Session = Depends(get_db)):
 @router.post("/api/payments/unified/webhooks/paypal")
 @limiter.limit(LIMIT_WEBHOOK)
 async def webhook_paypal(request: Request, db: Session = Depends(get_db)):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(400, "Invalid JSON body") from exc
     headers = {k.lower(): v for k, v in request.headers.items()}
     hdr = {
         "paypal-transmission-id": headers.get("paypal-transmission-id", ""),
@@ -185,7 +193,12 @@ async def webhook_paypal(request: Request, db: Session = Depends(get_db)):
         "paypal-auth-algo": headers.get("paypal-auth-algo", ""),
         "paypal-transmission-sig": headers.get("paypal-transmission-sig", ""),
     }
-    if not await pp.verify_webhook_signature(hdr, body):
+    try:
+        signature_ok = await pp.verify_webhook_signature(hdr, body)
+    except Exception as exc:
+        logger.warning("PayPal webhook signature verification failed: %s", exc)
+        raise HTTPException(403, "Invalid PayPal webhook signature") from exc
+    if not signature_ok:
         raise HTTPException(403, "Invalid PayPal webhook signature")
 
     et = body.get("event_type", "")
@@ -302,7 +315,12 @@ async def webhook_valu(request: Request, db: Session = Depends(get_db)):
     body = await request.body()
     signature = request.headers.get("hmac", "") or request.headers.get("HMAC", "")
     
-    if not vu.verify_webhook(body, signature):
+    try:
+        signature_ok = vu.verify_webhook(body, signature)
+    except Exception as exc:
+        logger.warning("Valu webhook signature verification failed: %s", exc)
+        raise HTTPException(403, "Invalid Valu webhook signature") from exc
+    if not signature_ok:
         raise HTTPException(403, "Invalid Valu webhook signature")
     
     import json
@@ -415,6 +433,17 @@ async def get_fawry_status(
     """
     from services.payment_platform.providers import fawry_get_charge_status
 
+    if not getattr(fw, "_provider", None) or not fw._provider.merchant_code or not fw._provider.security_key:
+        return {
+            "status": "unavailable",
+            "amount": None,
+            "payment_method": None,
+            "reference_number": reference_number,
+            "merchant_ref": None,
+            "provider": "fawry",
+            "message": "Fawry is not configured in this environment",
+        }
+
     try:
         result = await fawry_get_charge_status(charge_id=reference_number)
         return {
@@ -480,3 +509,370 @@ async def get_invoice_pdf(
     if not os.path.isfile(path):
         raise HTTPException(404, "PDF file missing on disk")
     return FileResponse(path, media_type="application/pdf", filename=f"{inv.invoice_number}.pdf")
+
+
+# ============================================================================
+# Egypt-Specific Payment Methods (Meeza, InstaPay, Valu)
+# ============================================================================
+
+class MeezaPaymentBody(BaseModel):
+    order_id: str = Field(..., min_length=1)
+    billing: Optional[Dict[str, str]] = None
+
+
+class MeezaPaymentResponse(BaseModel):
+    payment_record_id: str
+    provider: str = "paymob"
+    payment_method: str = "meeza"
+    iframe_token: str
+    paymob_order_id: int
+    iframe_url: Optional[str] = None
+    integration_type: str = "meeza"
+
+
+@router.post("/api/payments/paymob/meeza", response_model=MeezaPaymentResponse)
+@limiter.limit(LIMIT_PAYMENT)
+async def create_meeza_payment_session(
+    request: Request,
+    body: MeezaPaymentBody,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    """
+    Create a Meeza card payment session.
+    Meeza is Egypt's domestic card scheme - lower fees for local cards.
+    """
+    if not user:
+        raise HTTPException(401, "Authentication required")
+
+    order = db.query(OrderModel).filter(OrderModel.id == body.order_id).first()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if str(order.user_id) != str(user.id):
+        raise HTTPException(403, "Order ownership mismatch")
+
+    # Check Meeza integration is configured
+    meeza_integration = pm.get_integration_id("meeza")
+    if not meeza_integration:
+        raise HTTPException(503, "Meeza payment method not configured")
+
+    idem = request.headers.get("x-idempotency-key") or request.headers.get("X-Idempotency-Key")
+    cents = int(round(float(order.total) * 100))
+
+    # Check for existing payment
+    if idem:
+        existing = db.query(Payment).filter(Payment.idempotency_key == idem).first()
+        if existing and existing.client_payload:
+            return MeezaPaymentResponse(**existing.client_payload)
+
+    pay = Payment(
+        order_id=order.id,
+        user_id=str(user.id),
+        provider="paymob",
+        status=PaymentStatus.processing.value,
+        amount_cents=cents,
+        currency="egp",
+        idempotency_key=idem or f"idem_meeza_{uuid.uuid4().hex}",
+    )
+    db.add(pay)
+    db.flush()
+
+    billing = {**(body.billing or {}), "currency": "EGP"}
+
+    try:
+        tok = await pm.auth_token()
+        reg = await pm.register_order(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            merchant_order_id=order.id,
+        )
+        paymob_oid = int(reg.get("id"))
+        payment_key = await pm.create_payment_key(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            paymob_order_id=paymob_oid,
+            billing=billing,
+            payment_method="meeza",
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("Meeza payment session failed")
+        raise HTTPException(502, f"Meeza payment session failed: {e}") from e
+
+    pay.external_payment_id = str(paymob_oid)
+    pay.status = PaymentStatus.processing.value
+
+    iframe_base = os.getenv("PAYMOB_IFRAME_URL", "https://accept.paymob.com/api/acceptance/iframes")
+    iframe_id = os.getenv("PAYMOB_IFRAME_ID_MEEZA", os.getenv("PAYMOB_IFRAME_ID", "")).strip()
+    iframe_url = f"{iframe_base}/{iframe_id}?payment_token={payment_key}" if iframe_id else None
+
+    out = MeezaPaymentResponse(
+        payment_record_id=pay.id,
+        provider="paymob",
+        payment_method="meeza",
+        iframe_token=payment_key,
+        paymob_order_id=paymob_oid,
+        iframe_url=iframe_url,
+        integration_type="meeza",
+    )
+    pay.client_payload = out.model_dump()
+    db.add(
+        PaymentEvent(
+            payment_id=pay.id,
+            event_type="meeza_session_created",
+            provider_event_fingerprint=f"meeza:{paymob_oid}",
+            payload={"order_id": paymob_oid},
+        )
+    )
+    db.commit()
+    return out
+
+
+class InstaPayPaymentBody(BaseModel):
+    order_id: str = Field(..., min_length=1)
+    billing: Optional[Dict[str, str]] = None
+    bank_code: Optional[str] = None  # Optional: specific bank preference
+
+
+class InstaPayPaymentResponse(BaseModel):
+    payment_record_id: str
+    provider: str = "paymob"
+    payment_method: str = "instapay"
+    iframe_token: str
+    paymob_order_id: int
+    iframe_url: Optional[str] = None
+    integration_type: str = "instapay"
+    supported_banks: List[str] = Field(default_factory=lambda: [
+        "CIB", "QNB", "AlexBank", "Banque Misr",
+        "National Bank of Egypt", "Commercial International Bank"
+    ])
+
+
+@router.post("/api/payments/paymob/instapay", response_model=InstaPayPaymentResponse)
+@limiter.limit(LIMIT_PAYMENT)
+async def create_instapay_payment_session(
+    request: Request,
+    body: InstaPayPaymentBody,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    """
+    Create an InstaPay bank transfer payment session.
+    InstaPay provides instant bank transfers from all major Egyptian banks.
+    """
+    if not user:
+        raise HTTPException(401, "Authentication required")
+
+    order = db.query(OrderModel).filter(OrderModel.id == body.order_id).first()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if str(order.user_id) != str(user.id):
+        raise HTTPException(403, "Order ownership mismatch")
+
+    # Check InstaPay integration is configured
+    instapay_integration = pm.get_integration_id("instapay")
+    if not instapay_integration:
+        raise HTTPException(503, "InstaPay payment method not configured")
+
+    idem = request.headers.get("x-idempotency-key") or request.headers.get("X-Idempotency-Key")
+    cents = int(round(float(order.total) * 100))
+
+    # Check for existing payment
+    if idem:
+        existing = db.query(Payment).filter(Payment.idempotency_key == idem).first()
+        if existing and existing.client_payload:
+            return InstaPayPaymentResponse(**existing.client_payload)
+
+    pay = Payment(
+        order_id=order.id,
+        user_id=str(user.id),
+        provider="paymob",
+        status=PaymentStatus.processing.value,
+        amount_cents=cents,
+        currency="egp",
+        idempotency_key=idem or f"idem_instapay_{uuid.uuid4().hex}",
+    )
+    db.add(pay)
+    db.flush()
+
+    billing = {**(body.billing or {}), "currency": "EGP"}
+
+    try:
+        tok = await pm.auth_token()
+        reg = await pm.register_order(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            merchant_order_id=order.id,
+        )
+        paymob_oid = int(reg.get("id"))
+        payment_key = await pm.create_payment_key(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            paymob_order_id=paymob_oid,
+            billing=billing,
+            payment_method="instapay",
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("InstaPay payment session failed")
+        raise HTTPException(502, f"InstaPay payment session failed: {e}") from e
+
+    pay.external_payment_id = str(paymob_oid)
+    pay.status = PaymentStatus.processing.value
+
+    iframe_base = os.getenv("PAYMOB_IFRAME_URL", "https://accept.paymob.com/api/acceptance/iframes")
+    iframe_id = os.getenv("PAYMOB_IFRAME_ID_INSTAPAY", os.getenv("PAYMOB_IFRAME_ID", "")).strip()
+    iframe_url = f"{iframe_base}/{iframe_id}?payment_token={payment_key}" if iframe_id else None
+
+    out = InstaPayPaymentResponse(
+        payment_record_id=pay.id,
+        provider="paymob",
+        payment_method="instapay",
+        iframe_token=payment_key,
+        paymob_order_id=paymob_oid,
+        iframe_url=iframe_url,
+        integration_type="instapay",
+    )
+    pay.client_payload = out.model_dump()
+    db.add(
+        PaymentEvent(
+            payment_id=pay.id,
+            event_type="instapay_session_created",
+            provider_event_fingerprint=f"instapay:{paymob_oid}",
+            payload={"order_id": paymob_oid},
+        )
+    )
+    db.commit()
+    return out
+
+
+class ValuPaymentBody(BaseModel):
+    order_id: str = Field(..., min_length=1)
+    billing: Optional[Dict[str, str]] = None
+    tenor: int = Field(6, ge=6, le=36, description="Installment period in months")
+
+
+class ValuPaymentResponse(BaseModel):
+    payment_record_id: str
+    provider: str = "paymob"
+    payment_method: str = "valu"
+    iframe_token: str
+    paymob_order_id: int
+    iframe_url: Optional[str] = None
+    tenor_months: int
+    monthly_installment_piastres: int
+    integration_type: str = "valu"
+
+
+@router.post("/api/payments/paymob/valu", response_model=ValuPaymentResponse)
+@limiter.limit(LIMIT_PAYMENT)
+async def create_valu_payment_session(
+    request: Request,
+    body: ValuPaymentBody,
+    db: Session = Depends(get_db),
+    user: Optional[UserProfile] = Depends(optional_auth),
+):
+    """
+    Create a Valu BNPL (Buy Now, Pay Later) payment session.
+    Valu allows customers to split payments over 6-36 months.
+    """
+    if not user:
+        raise HTTPException(401, "Authentication required")
+
+    order = db.query(OrderModel).filter(OrderModel.id == body.order_id).first()
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if str(order.user_id) != str(user.id):
+        raise HTTPException(403, "Order ownership mismatch")
+
+    # Check Valu integration is configured
+    valu_integration = pm.get_integration_id("valu")
+    if not valu_integration:
+        raise HTTPException(503, "Valu BNPL not configured")
+
+    idem = request.headers.get("x-idempotency-key") or request.headers.get("X-Idempotency-Key")
+    cents = int(round(float(order.total) * 100))
+
+    # Validate tenor
+    valid_tenors = [6, 9, 12, 18, 24, 36]
+    if body.tenor not in valid_tenors:
+        raise HTTPException(400, f"Invalid tenor. Must be one of: {valid_tenors}")
+
+    # Check for existing payment
+    if idem:
+        existing = db.query(Payment).filter(Payment.idempotency_key == idem).first()
+        if existing and existing.client_payload:
+            return ValuPaymentResponse(**existing.client_payload)
+
+    pay = Payment(
+        order_id=order.id,
+        user_id=str(user.id),
+        provider="paymob",
+        status=PaymentStatus.processing.value,
+        amount_cents=cents,
+        currency="egp",
+        idempotency_key=idem or f"idem_valu_{uuid.uuid4().hex}",
+    )
+    db.add(pay)
+    db.flush()
+
+    billing = {**(body.billing or {}), "currency": "EGP"}
+
+    try:
+        tok = await pm.auth_token()
+        reg = await pm.register_order(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            merchant_order_id=order.id,
+        )
+        paymob_oid = int(reg.get("id"))
+        payment_key = await pm.create_payment_key(
+            auth_tok=tok,
+            amount_cents=cents,
+            currency="EGP",
+            paymob_order_id=paymob_oid,
+            billing=billing,
+            payment_method="valu",
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("Valu payment session failed")
+        raise HTTPException(502, f"Valu payment session failed: {e}") from e
+
+    pay.external_payment_id = str(paymob_oid)
+    pay.status = PaymentStatus.processing.value
+
+    # Calculate monthly installment (simple division, provider may add fees)
+    monthly = cents // body.tenor
+
+    iframe_base = os.getenv("PAYMOB_IFRAME_URL", "https://accept.paymob.com/api/acceptance/iframes")
+    iframe_id = os.getenv("PAYMOB_IFRAME_ID_VALU", os.getenv("PAYMOB_IFRAME_ID", "")).strip()
+    iframe_url = f"{iframe_base}/{iframe_id}?payment_token={payment_key}" if iframe_id else None
+
+    out = ValuPaymentResponse(
+        payment_record_id=pay.id,
+        provider="paymob",
+        payment_method="valu",
+        iframe_token=payment_key,
+        paymob_order_id=paymob_oid,
+        iframe_url=iframe_url,
+        tenor_months=body.tenor,
+        monthly_installment_piastres=monthly,
+        integration_type="valu",
+    )
+    pay.client_payload = out.model_dump()
+    db.add(
+        PaymentEvent(
+            payment_id=pay.id,
+            event_type="valu_session_created",
+            provider_event_fingerprint=f"valu:{paymob_oid}",
+            payload={"order_id": paymob_oid, "tenor": body.tenor},
+        )
+    )
+    db.commit()
+    return out

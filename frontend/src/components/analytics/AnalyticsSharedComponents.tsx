@@ -192,7 +192,7 @@ interface HeatmapCell {
 }
 
 interface HeatmapProps {
-  data: HeatmapCell[];
+  data?: HeatmapCell[] | null;
   loading?: boolean;
 }
 
@@ -208,7 +208,8 @@ export function VisitorHeatmap({ data, loading = false }: HeatmapProps) {
     );
   }
 
-  const maxValue = Math.max(...data.map(d => d.visitor_count), 1);
+  const safeData = Array.isArray(data) ? data : [];
+  const maxValue = Math.max(...safeData.map(d => d.visitor_count || 0), 1);
 
   const getColor = (value: number) => {
     const intensity = value / maxValue;
@@ -220,7 +221,7 @@ export function VisitorHeatmap({ data, loading = false }: HeatmapProps) {
   };
 
   const getCellValue = (day: number, hour: number) => {
-    const cell = data.find(d => d.day_of_week === day && d.hour === hour);
+    const cell = safeData.find(d => d.day_of_week === day && d.hour === hour);
     return cell?.visitor_count || 0;
   };
 

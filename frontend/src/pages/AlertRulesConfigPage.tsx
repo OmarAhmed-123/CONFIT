@@ -48,6 +48,9 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { useAlertRules, type AlertFrequency, type SensitivityPreset } from '@/hooks/useAlertRules';
 import { createTransition } from '@/motion';
 
+type InventoryVelocityPreset = SensitivityPreset;
+type DeliveryMode = AlertFrequency['delivery_mode'];
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const ALERT_TYPE_CONFIG = {

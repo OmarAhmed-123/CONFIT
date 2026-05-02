@@ -1,0 +1,222 @@
+{
+  "app": {
+    "name": "CONFIT",
+    "tagline": "أسلوبك، ذكاء اصطناعي يُمَكِّنُك"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "retry": "إعادة المحاولة",
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "create": "إنشاء",
+    "search": "بحث",
+    "filter": "تصفية",
+    "sort": "ترتيب",
+    "next": "التالي",
+    "previous": "السابق",
+    "confirm": "تأكيد",
+    "close": "إغلاق",
+    "back": "رجوع",
+    "continue": "متابعة",
+    "submit": "إرسال",
+    "success": "نجاح",
+    "warning": "تحذير",
+    "info": "معلومات",
+    "yes": "نعم",
+    "no": "لا",
+    "or": "أو",
+    "and": "و"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "signup": "إنشاء حساب",
+    "logout": "تسجيل الخروج",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "resetPassword": "إعادة تعيين كلمة المرور",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "firstName": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "phoneNumber": "رقم الهاتف",
+    "alreadyHaveAccount": "لديك حساب بالفعل؟",
+    "dontHaveAccount": "ليس لديك حساب؟",
+    "loginWithGoogle": "تسجيل الدخول بـ Google",
+    "signupWithGoogle": "إنشاء حساب بـ Google",
+    "agreeTerms": "أوافق على شروط الاستخدام وسياسة الخصوصية"
+  },
+  "navigation": {
+    "home": "الرئيسية",
+    "discover": "استكشف",
+    "shop": "تسوق",
+    "wardrobe": "خزانتي",
+    "mirror": "المرآة",
+    "muse": "MUSE",
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "notifications": "الإشعارات",
+    "cart": "سلة التسوق",
+    "wishlist": "المفضلة",
+    "orders": "طلباتي",
+    "support": "الدعم"
+  },
+  "home": {
+    "welcome": "مرحباً بك في CONFIT",
+    "discoverStyle": "اكتشف أسلوبك الفريد",
+    "aiPowered": "بدعم الذكاء الاصطناعي",
+    "featuredCollections": "مجموعات مميزة",
+    "trendingNow": "الأكثر رواجاً",
+    "newArrivals": "وصل حديثاً",
+    "personalizedForYou": "مخصص لك"
+  },
+  "muse": {
+    "title": "MUSE - مصممك الشخصي بالذكاء الاصطناعي",
+    "subtitle": "دردش مع مصمم أزياء افتراضي",
+    "startChat": "ابدأ المحادثة",
+    "typeMessage": "اكتب رسالتك هنا...",
+    "send": "إرسال",
+    "suggestions": "اقتراحات",
+    "outfitIdeas": "أفكار للإطلالات",
+    "styleAdvice": "نصائح الأناقة",
+    "colorMatching": "تنسيق الألوان",
+    "occasionHelp": "مساعدة المناسبات",
+    "chatHistory": "سجل المحادثات",
+    "clearChat": "مسح المحادثة",
+    "thinking": "MUSE يفكر..."
+  },
+  "mirror": {
+    "title": "MIRROR - جرب ملابسك افتراضياً",
+    "uploadPhoto": "ارفع صورتك",
+    "selectItem": "اختر قطعة ملابس",
+    "tryOn": "جرب الآن",
+    "result": "النتيجة",
+    "retake": "إعادة التصوير",
+    "newTry": "تجربة جديدة",
+    "tips": {
+      "title": "نصائح للحصول على أفضل نتيجة",
+      "goodLighting": "تأكد من الإضاءة الجيدة",
+      "clearBackground": "خلفية واضحة",
+      "fullBody": "صورة كاملة للجسم",
+      "frontView": "منظر أمامي"
+    }
+  },
+  "wardrobe": {
+    "title": "خزانتي",
+    "myItems": "قطعي",
+    "addItem": "إضافة قطعة",
+    "createOutfit": "إنشاء إطلالة",
+    "outfits": "الإطلالات",
+    "categories": {
+      "tops": "قمصان",
+      "bottoms": "بناطيل",
+      "dresses": "فساتين",
+      "outerwear": "معاطف",
+      "shoes": "أحذية",
+      "accessories": "إكسسوارات"
+    },
+    "empty": "خزانتك فارغة",
+    "addFirstItem": "أضف أول قطعة",
+    "itemCount": "{count} قطعة | {count} قطع"
+  },
+  "shop": {
+    "title": "تسوق",
+    "filters": {
+      "title": "تصفية",
+      "price": "السعر",
+      "size": "المقاس",
+      "color": "اللون",
+      "brand": "الماركة",
+      "category": "الفئة"
+    },
+    "sortBy": "ترتيب حسب",
+    "priceLowToHigh": "السعر: من الأقل للأعلى",
+    "priceHighToLow": "السعر: من الأعلى للأقل",
+    "newest": "الأحدث",
+    "popular": "الأكثر شعبية",
+    "addToCart": "أضف للسلة",
+    "outOfStock": "غير متوفر",
+    "quickView": "نظرة سريعة"
+  },
+  "product": {
+    "details": "تفاصيل المنتج",
+    "description": "الوصف",
+    "sizeGuide": "دليل المقاسات",
+    "reviews": "التقييمات",
+    "relatedProducts": "منتجات مشابهة",
+    "addToWishlist": "أضف للمفضلة",
+    "share": "مشاركة",
+    "inStock": "متوفر",
+    "selectSize": "اختر المقاس",
+    "selectColor": "اختر اللون"
+  },
+  "cart": {
+    "title": "سلة التسوق",
+    "empty": "سلة التسوق فارغة",
+    "continueShopping": "مواصلة التسوق",
+    "items": "المنتجات",
+    "quantity": "الكمية",
+    "remove": "إزالة",
+    "subtotal": "المجموع الفرعي",
+    "shipping": "الشحن",
+    "tax": "الضريبة",
+    "total": "الإجمالي",
+    "checkout": "إتمام الشراء",
+    "promoCode": "كود الخصم",
+    "apply": "تطبيق"
+  },
+  "checkout": {
+    "title": "إتمام الشراء",
+    "shippingAddress": "عنوان الشحن",
+    "paymentMethod": "طريقة الدفع",
+    "orderSummary": "ملخص الطلب",
+    "placeOrder": "تأكيد الطلب",
+    "addAddress": "إضافة عنوان",
+    "cashOnDelivery": "الدفع عند الاستلام",
+    "creditCard": "بطاقة ائتمان",
+    "fawry": "Fawry",
+    "vodafoneCash": "فودافون كاش",
+    "instaPay": "InstaPay"
+  },
+  "profile": {
+    "title": "الملف الشخصي",
+    "personalInfo": "المعلومات الشخصية",
+    "preferences": "التفضيلات",
+    "bodyMeasurements": "المقاسات",
+    "stylePreferences": "تفضيلات الأسلوب",
+    "editProfile": "تعديل الملف الشخصي",
+    "changePhoto": "تغيير الصورة",
+    "accountSettings": "إعدادات الحساب"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "markAllRead": "تحديد الكل كمقروء",
+    "empty": "لا توجد إشعارات",
+    "types": {
+      "order": "طلب",
+      "promotion": "عرض",
+      "social": "اجتماعي",
+      "system": "نظام"
+    }
+  },
+  "errors": {
+    "generic": "حدث خطأ. يرجى المحاولة مرة أخرى.",
+    "network": "خطأ في الاتصال. تأكد من اتصالك بالإنترنت.",
+    "unauthorized": "غير مصرح. يرجى تسجيل الدخول.",
+    "notFound": "الصفحة غير موجودة",
+    "validation": "يرجى التحقق من المدخلات",
+    "rateLimit": "تم تجاوز الحد المسموح. يرجى الانتظار."
+  },
+  "footer": {
+    "about": "عن CONFIT",
+    "contact": "تواصل معنا",
+    "careers": "وظائف",
+    "privacy": "سياسة الخصوصية",
+    "terms": "شروط الاستخدام",
+    "social": "تابعنا",
+    "newsletter": "النشرة البريدية",
+    "subscribe": "اشترك"
+  }
+}

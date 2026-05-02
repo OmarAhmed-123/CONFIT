@@ -151,13 +151,13 @@ def build_sales_query(params: SalesQueryParams):
     if params.return_status:
         query = query.where(SalesTransaction.return_status == params.return_status)
     
-    # Search filtering (product name or customer name)
+    # Search filtering (product name or customer name) - cross-database compatible
     if params.search:
-        search_term = f"%{params.search}%"
+        search_term = f"%{params.search.lower()}%"
         query = query.where(
             or_(
-                SalesTransaction.product_name.ilike(search_term),
-                SalesTransaction.customer_name.ilike(search_term),
+                func.lower(SalesTransaction.product_name).like(search_term),
+                func.lower(SalesTransaction.customer_name).like(search_term),
             )
         )
     

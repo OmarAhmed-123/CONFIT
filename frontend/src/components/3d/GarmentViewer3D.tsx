@@ -247,7 +247,7 @@ function GarmentModel({ url, color, onLoaded, onError }: GarmentModelProps) {
   const meshRef = useRef<THREE.Group>(null);
 
   const { scene } = useGLTF(url, true, true, (loader) => {
-    loader.setDRACOLoader(dracoLoader);
+    loader.setDRACOLoader(dracoLoader as any);
   });
 
   const model = useMemo(() => {

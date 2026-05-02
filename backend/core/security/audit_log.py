@@ -26,6 +26,8 @@ class AuditEventType:
     # Auth events
     LOGIN = "auth:login"
     LOGIN_FAILED = "auth:login_failed"
+    REGISTER = "auth:register"
+    REGISTER_FAILED = "auth:register_failed"
     LOGOUT = "auth:logout"
     PASSWORD_CHANGE = "auth:password_change"
     PASSWORD_RESET_REQUEST = "auth:password_reset_request"

@@ -10,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { mockProducts, getFeaturedProducts } from '@/services/mockData';
 import { apiUrl } from '@/lib/api';
+import { unwrapApiData } from '@/lib/api/envelope';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types';
 
@@ -65,6 +66,7 @@ export function useProductViewModel(productId: string) {
         if (mock) {
             setProduct(mock);
             setSelectedColor(mock.colors?.[0] ?? '');
+            setSelectedSize(mock.sizes?.[0] ?? '');
             setRelatedProducts(getFeaturedProducts(4));
         }
 
@@ -76,9 +78,11 @@ export function useProductViewModel(productId: string) {
                     return;
                 }
                 if (!res.ok) throw new Error('Failed to load');
-                const data: Product = await res.json();
+                const payload = await res.json();
+                const data = unwrapApiData<Product>(payload);
                 setProduct(data);
                 setSelectedColor(data.colors?.[0] ?? '');
+                setSelectedSize(data.sizes?.[0] ?? '');
                 setNotFound(false);
                 setRelatedProducts(getFeaturedProducts(4));
             })
@@ -95,8 +99,9 @@ export function useProductViewModel(productId: string) {
 
     const fitRec = useMemo(() => {
         if (!product) return { text: 'Unknown Fit', color: 'text-muted-foreground' };
-        if (product.styleCompatibility >= 90) return { text: 'Perfect Fit', color: 'text-success' };
-        if (product.styleCompatibility >= 75) return { text: 'Great Fit', color: 'text-accent' };
+        const compatibility = product.styleCompatibility ?? product.style_compatibility ?? 0;
+        if (compatibility >= 90) return { text: 'Perfect Fit', color: 'text-success' };
+        if (compatibility >= 75) return { text: 'Great Fit', color: 'text-accent' };
         return { text: 'Good Fit', color: 'text-muted-foreground' };
     }, [product]);
 

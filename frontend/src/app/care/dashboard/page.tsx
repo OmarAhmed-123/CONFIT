@@ -6,7 +6,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -15,23 +14,22 @@ import type { DonationCampaign } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Plus, Users, Gift, TrendingUp, Settings } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CareDashboardPage() {
-  const { data: session, status } = useSession();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [dashboard, setDashboard] = useState<DonorDashboard | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login?callbackUrl=/care/dashboard');
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/care/dashboard');
       return;
     }
-
-    if (status === 'authenticated') {
-      loadDashboard();
-    }
-  }, [status, router]);
+    loadDashboard();
+  }, [isAuthenticated, authLoading, router]);
 
   const loadDashboard = async () => {
     try {
@@ -40,11 +38,11 @@ export default function CareDashboardPage() {
     } catch (error) {
       toast.error('Failed to load dashboard');
     } finally {
-      setIsLoading(false);
+      setDashboardLoading(false);
     }
   };
 
-  if (isLoading) {
+  if (authLoading || dashboardLoading || !isAuthenticated) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-4 border-[var(--color-gold-400)] border-t-transparent rounded-full" />

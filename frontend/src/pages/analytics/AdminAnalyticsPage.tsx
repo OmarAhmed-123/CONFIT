@@ -534,7 +534,8 @@ export default function AdminAnalyticsPage() {
                 <CardContent className="p-6">
                   <p className="text-sm text-muted-foreground mb-1">Avg Order Value</p>
                   <p className="text-2xl font-bold">
-                    {revenueData.reduce((sum, d) => sum + d.revenue_egp, 0) / 
+                    {(
+                      revenueData.reduce((sum, d) => sum + d.revenue_egp, 0) /
                       (revenueData.reduce((sum, d) => sum + d.orders, 0) || 1)
                     ).toFixed(0)} EGP
                   </p>

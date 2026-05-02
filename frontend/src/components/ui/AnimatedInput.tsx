@@ -6,6 +6,7 @@ export function AnimatedInput({
   className,
   ...props
 }: React.ComponentProps<typeof Input>) {
+  const inputClassName = (props as { className?: string }).className;
   return (
     <div
       className={cn(
@@ -29,7 +30,7 @@ export function AnimatedInput({
           "relative z-10 rounded-2xl bg-background/60 border-white/10",
           "focus-visible:ring-accent/50 focus-visible:border-accent/50",
           "transition-colors duration-200",
-          props.className
+          inputClassName
         )}
       />
     </div>

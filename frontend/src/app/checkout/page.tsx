@@ -5,7 +5,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { MainLayout } from '@/components/layout';
 
 const CheckoutPage = dynamic(
   () => import('@/pages/Checkout').then((mod) => mod.default),
@@ -20,9 +19,5 @@ const CheckoutPage = dynamic(
 );
 
 export default function CheckoutRoute() {
-  return (
-    <MainLayout>
-      <CheckoutPage />
-    </MainLayout>
-  );
+  return <CheckoutPage />;
 }

@@ -291,7 +291,7 @@ export function useOwnerNotifications() {
           enqueue({
             id: String(n.notification_id),
             message: '',
-            metadata: { status: n.status, ...n },
+            metadata: { ...n, status: n.status },
             read_status: false,
             created_at: n.created_at ?? null,
             data: n,

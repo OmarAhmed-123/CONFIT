@@ -5,7 +5,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { MainLayout } from '@/components/layout';
 
 const CartPage = dynamic(
   () => import('@/pages/Cart').then((mod) => mod.default),
@@ -20,9 +19,5 @@ const CartPage = dynamic(
 );
 
 export default function CartRoute() {
-  return (
-    <MainLayout>
-      <CartPage />
-    </MainLayout>
-  );
+  return <CartPage />;
 }

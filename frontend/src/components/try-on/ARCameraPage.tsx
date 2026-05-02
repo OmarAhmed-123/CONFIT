@@ -206,6 +206,8 @@ export function ARCameraPage({
                         onTryOn={() => setActiveTab('camera')}
                         canTryOn={!!selectedProduct}
                         isProcessing={false}
+                        selectedSize={selectedProduct?.sizes?.[0] || ''}
+                        onSizeChange={() => {}}
                       />
                     </ScrollArea>
                   </CardContent>

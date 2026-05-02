@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ErrorResponse:
-    """Standardized error response."""
+    """Standardized error response with Arabic localization support."""
     
     @staticmethod
     def create(
@@ -34,15 +34,26 @@ class ErrorResponse:
         error_code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         request_id: Optional[str] = None,
+        language: str = "en",
     ) -> Dict[str, Any]:
-        """Create error response dictionary."""
+        """Create error response dictionary with localization."""
+        from core.error_messages import get_error_message
+        
+        # If error_code provided, use localized message
+        if error_code:
+            localized_message = get_error_message(error_code, language)
+        else:
+            localized_message = message
+        
         return {
             "error": {
                 "code": error_code or f"ERR_{status_code}",
-                "message": message,
+                "message": localized_message,
+                "original_message": message if error_code else None,
                 "details": details,
                 "request_id": request_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "language": language,
             },
             "status": status_code,
         }
@@ -160,9 +171,30 @@ class ServiceUnavailableException(AppException):
 # EXCEPTION HANDLERS
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _get_request_language(request: Request) -> str:
+    """Extract language from request headers or query params."""
+    # Check query parameter first
+    language = request.query_params.get("lang")
+    if language in ("en", "ar"):
+        return language
+    
+    # Check Accept-Language header
+    accept_lang = request.headers.get("Accept-Language", "")
+    if accept_lang.startswith("ar"):
+        return "ar"
+    
+    # Check X-Preferred-Language header (custom app header)
+    preferred = request.headers.get("X-Preferred-Language", "")
+    if preferred in ("en", "ar"):
+        return preferred
+    
+    return "en"
+
+
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
-    """Handle application exceptions."""
+    """Handle application exceptions with localization."""
     request_id = getattr(request.state, "request_id", str(uuid4()))
+    language = _get_request_language(request)
     
     # Log error
     logger.error(
@@ -172,6 +204,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
             "error_code": exc.error_code,
             "status_code": exc.status_code,
             "details": exc.details,
+            "language": language,
         }
     )
     
@@ -181,6 +214,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         error_code=exc.error_code,
         details=exc.details,
         request_id=request_id,
+        language=language,
     )
     
     headers = {}
@@ -195,8 +229,9 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-    """Handle HTTP exceptions."""
+    """Handle HTTP exceptions with localization."""
     request_id = getattr(request.state, "request_id", str(uuid4()))
+    language = _get_request_language(request)
     
     # Log if server error
     if exc.status_code >= 500:
@@ -210,6 +245,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         message=str(exc.detail),
         error_code=f"HTTP_{exc.status_code}",
         request_id=request_id,
+        language=language,
     )
     
     return JSONResponse(
@@ -219,8 +255,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Handle validation errors."""
+    """Handle validation errors with localization."""
     request_id = getattr(request.state, "request_id", str(uuid4()))
+    language = _get_request_language(request)
     
     # Format validation errors
     errors = []
@@ -242,6 +279,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         error_code="VALIDATION_ERROR",
         details={"errors": errors},
         request_id=request_id,
+        language=language,
     )
     
     return JSONResponse(
@@ -251,8 +289,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handle unexpected exceptions."""
+    """Handle unexpected exceptions with localization."""
     request_id = getattr(request.state, "request_id", str(uuid4()))
+    language = _get_request_language(request)
     
     # Log full error
     logger.exception(
@@ -279,6 +318,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
         error_code="INTERNAL_ERROR",
         details=details,
         request_id=request_id,
+        language=language,
     )
     
     return JSONResponse(

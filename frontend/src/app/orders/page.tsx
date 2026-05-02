@@ -5,7 +5,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { MainLayout } from '@/components/layout';
 
 const OrderHistoryPage = dynamic(
   () => import('@/pages/OrderHistory').then((mod) => mod.default),
@@ -20,9 +19,5 @@ const OrderHistoryPage = dynamic(
 );
 
 export default function OrdersRoute() {
-  return (
-    <MainLayout>
-      <OrderHistoryPage />
-    </MainLayout>
-  );
+  return <OrderHistoryPage />;
 }

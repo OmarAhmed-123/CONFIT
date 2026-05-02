@@ -60,7 +60,7 @@ export default function BrandsPage() {
                         productCount?: number;
                     };
 
-                    const mapped: Brand[] = data
+                    const mapped = data
                         .map((row) => {
                             if (!row || typeof row !== "object") return null;
                             const r = row as ApiBrandRow;

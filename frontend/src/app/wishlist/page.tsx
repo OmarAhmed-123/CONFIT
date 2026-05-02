@@ -5,7 +5,6 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { MainLayout } from '@/components/layout';
 
 const WishlistPage = dynamic(
   () => import('@/pages/Wishlist').then((mod) => mod.default),
@@ -20,9 +19,5 @@ const WishlistPage = dynamic(
 );
 
 export default function WishlistRoute() {
-  return (
-    <MainLayout>
-      <WishlistPage />
-    </MainLayout>
-  );
+  return <WishlistPage />;
 }

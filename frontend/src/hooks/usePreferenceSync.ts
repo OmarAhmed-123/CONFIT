@@ -394,6 +394,10 @@ export function usePreferenceSync(options: UsePreferenceSyncOptions) {
     
     // Error - rollback and handle
     onError: async (error, variables, context) => {
+      if (!context) {
+        setSyncError(error instanceof Error ? error : new Error('Sync failed'));
+        return;
+      }
       // Rollback optimistic state
       setOptimisticState(context.previousOptimistic);
       

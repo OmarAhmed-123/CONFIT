@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { normalizeRoles } from '@/lib/auth/roles';
+import { getUserRoles } from '@/lib/auth/roles';
 
 // Role enum matching backend
 export enum AppRole {
@@ -164,8 +164,8 @@ export function useRBAC(): RBACResult {
   const { user } = useAuth();
   
   const roles = useMemo(() => {
-    return normalizeRoles(user?.roles).map((role) => role as AppRole);
-  }, [user?.roles]);
+    return getUserRoles(user).map((role) => role as AppRole);
+  }, [user]);
   
   const permissions = useMemo(() => {
     const allPermissions = new Set<string>();
@@ -215,7 +215,7 @@ export function useRBAC(): RBACResult {
     };
     
     const requiredPerms = featurePermissions[feature];
-    if (!requiredPerms) return true; // Unknown features are accessible by default
+    if (!requiredPerms) return false;
     return hasAnyPermission(requiredPerms);
   };
   

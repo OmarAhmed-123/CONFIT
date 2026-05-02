@@ -12,7 +12,13 @@ import { JWT } from 'next-auth/jwt';
 // In development, use empty string to leverage Next.js rewrites (proxy to backend)
 // In production, use the explicit backend URL
 const isDev = process.env.NODE_ENV === 'development';
-const API_BASE_URL = isDev ? '' : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001');
+const API_BASE_URL = isDev ? '' : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000');
+const devNextAuthSecret = 'confit-dev-nextauth-secret-change-in-production';
+
+if (isDev) {
+  process.env.NEXTAUTH_URL ||= process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  process.env.NEXTAUTH_SECRET ||= devNextAuthSecret;
+}
 
 const googleClientId =
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '';
@@ -87,6 +93,7 @@ declare module 'next-auth/jwt' {
 }
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET || (isDev ? devNextAuthSecret : undefined),
   providers: [
     ...providers,
     // Credentials Provider (for email/password login)

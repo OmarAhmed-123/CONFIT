@@ -292,24 +292,28 @@ class VoucherValidate(BaseModel):
     voucher_token: str = Field(..., min_length=12, max_length=32, description="Voucher token")
 
 
-class VoucherResponse(BaseResponseModel):
-    """Schema for voucher response."""
+class VoucherResponse(BaseModel):
+    """Response when creating or retrieving a voucher."""
     id: str
     campaign_id: str
-    beneficiary_id: Optional[str]
-    voucher_token: str
-    budget_allocated: float
-    budget_used: float
-    budget_remaining: float
+    beneficiary_id: str
+    voucher_token: str = Field(alias="code")
+    budget_allocated: float = Field(alias="amount")
+    budget_used: float = Field(alias="used")
+    budget_remaining: float = Field(alias="balance")
     currency: str
     status: VoucherStatus
     issued_at: Optional[datetime]
     sent_at: Optional[datetime]
     accessed_at: Optional[datetime]
-    expires_at: datetime
-    used_at: Optional[datetime]
+    expires_at: Optional[datetime] = Field(default=None, alias="expiresAt")
+    is_active: bool = Field(alias="isActive")
+    used_at: Optional[datetime] = Field(default=None, alias="usedAt")
     completed_at: Optional[datetime]
     created_at: datetime
+
+    class Config:
+        populate_by_name = True
 
 
 class VoucherListResponse(PaginatedResponse):
@@ -531,7 +535,7 @@ class CareError(BaseModel):
     details: Optional[Dict[str, Any]] = None
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "error_code": "CARE_002",
                 "message": "Invalid voucher token",

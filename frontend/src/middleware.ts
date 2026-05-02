@@ -19,11 +19,17 @@ const PUBLIC_ROUTES = [
   '/stores',
   '/terms',
   '/privacy',
+  '/care',
 ];
 
 // Routes that require specific roles
 const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
+  '/analytics/admin': ['admin'],
+  '/analytics/me': ['admin', 'brand_manager', 'stylist', 'user'],
+  '/analytics/brand': ['admin', 'brand_manager'],
+  '/analytics/store': ['admin', 'brand_manager'],
   '/admin': ['admin'],
+  '/ai-admin': ['admin'],
   '/brand-dashboard': ['admin', 'brand_manager'],
   '/store-dashboard': ['admin', 'brand_manager'],
   '/stylist-dashboard': ['admin', 'stylist'],
@@ -31,6 +37,7 @@ const ROLE_PROTECTED_ROUTES: Record<string, string[]> = {
   '/notification-analytics': ['admin', 'brand_manager'],
   '/security': ['admin'],
   '/payment-debug': ['admin'],
+  '/monitoring': ['admin'],
   '/ai-stylist': ['admin', 'brand_manager', 'stylist'],
   '/stylist': ['admin', 'brand_manager', 'stylist'],
 };
@@ -44,11 +51,16 @@ const AUTH_REQUIRED_ROUTES = [
   '/cart',
   '/checkout',
   '/try-on',
+  '/try-on-live',
   '/outfits',
   '/notifications',
   '/notification-preferences',
-  '/care',
+  '/care/dashboard',
 ];
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
 
 function isPublicRoute(pathname: string): boolean {
   // Check exact match
@@ -58,7 +70,7 @@ function isPublicRoute(pathname: string): boolean {
   
   // Check prefix for dynamic routes
   // Product pages are public
-  if (pathname.startsWith('/product/')) {
+  if (matchesRoute(pathname, '/product')) {
     return true;
   }
   
@@ -77,7 +89,7 @@ function isPublicRoute(pathname: string): boolean {
 
 function getRequiredRoles(pathname: string): string[] | null {
   for (const [route, roles] of Object.entries(ROLE_PROTECTED_ROUTES)) {
-    if (pathname.startsWith(route)) {
+    if (matchesRoute(pathname, route)) {
       return roles;
     }
   }
@@ -85,7 +97,7 @@ function getRequiredRoles(pathname: string): string[] | null {
 }
 
 function requiresAuth(pathname: string): boolean {
-  if (AUTH_REQUIRED_ROUTES.some(route => pathname.startsWith(route))) {
+  if (AUTH_REQUIRED_ROUTES.some(route => matchesRoute(pathname, route))) {
     return true;
   }
   return getRequiredRoles(pathname) !== null;

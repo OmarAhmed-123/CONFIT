@@ -6,6 +6,7 @@
  */
 
 import { api, API_BASE_URL, getAccessToken } from '@/lib/api/client';
+import { getCurrentLanguage } from '@/hooks/useLanguage';
 
 // ═══════════════════════════════════════════════════════════════════
 // TYPES
@@ -191,9 +192,16 @@ export interface AIDailyReport {
 // ═══════════════════════════════════════════════════════════════════
 
 export const museService = {
-  /** Chat with MUSE AI stylist */
-  chat: (payload: MuseChatRequest) =>
-    api.post<MuseChatResponse>('/api/v1/muse/chat', payload),
+  /** Chat with MUSE AI stylist - automatically detects browser language */
+  chat: (payload: MuseChatRequest) => {
+    // Auto-detect browser language if not explicitly provided
+    const language = payload.language || getCurrentLanguage();
+    const enhancedPayload = {
+      ...payload,
+      language,
+    };
+    return api.post<MuseChatResponse>('/api/v1/muse/chat', enhancedPayload);
+  },
 
   /** Get session conversation history */
   getHistory: (sessionId: string) =>

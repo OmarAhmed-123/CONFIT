@@ -6,6 +6,7 @@ import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AddItemModal, type WardrobeItemInput } from '@/components/wardrobe/AddItemModal';
+import WardrobeAnalyticsPanel from '@/components/wardrobe/WardrobeAnalyticsPanel';
 import { useWardrobeViewModel, type WardrobeItemData } from '@/viewmodels/useWardrobeViewModel';
 import { getAuthToken } from '@/lib/auth';
 import { createStaggerTransition, transitionStandard } from '@/motion';
@@ -141,6 +142,7 @@ export default function WardrobePage() {
                 <input
                   type="file"
                   accept="image/*"
+                  aria-label="Upload wardrobe item photo"
                   className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed"
                   onChange={handleFileUpload}
                   disabled={isUploading || localUploading}
@@ -155,12 +157,9 @@ export default function WardrobePage() {
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <StatCard label="Total Items" value={items.length.toString()} />
-            <StatCard label="Categories" value={new Set(items.map(i => i.category)).size.toString()} />
-            <StatCard label="Outfits Created" value="12" />
-            <StatCard label="Style Score" value="85%" />
+          {/* Analytics Panel */}
+          <div className="mb-8">
+            <WardrobeAnalyticsPanel />
           </div>
 
           {/* Search & Filters */}

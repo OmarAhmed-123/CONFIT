@@ -284,7 +284,7 @@ function analyzePose(landmarks: Keypoint[]): { isGoodPose: boolean; feedback: st
 /**
  * Calculate overall pose score
  */
-function calculatePoseScore(landmarks: Keypoint[]): float {
+function calculatePoseScore(landmarks: Keypoint[]): number {
   // Key landmarks for try-on
   const keyIndices = [
     0,   // nose

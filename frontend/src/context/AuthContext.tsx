@@ -15,13 +15,13 @@ import { normalizeRoles } from '@/lib/auth/roles';
 // Backend response types
 interface AuthResponsePayload {
   success?: boolean;
-  token?: string;
   access_token?: string;
   refresh_token?: string;
   token_type?: string;
   expires_in?: number;
   user?: UserDTO;
   message?: string;
+  dev_reset_link?: string;
 }
 
 interface UserDTO {
@@ -51,7 +51,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<{ error?: string }>;
   refreshUser: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error?: string }>;
+  resetPassword: (email: string) => Promise<{ error?: string; resetLink?: string }>;
+  confirmPasswordReset: (token: string, newPassword: string) => Promise<{ error?: string; user?: UserProfile }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -87,10 +88,10 @@ function toUserProfile(dto: UserDTO): UserProfile {
 // In development, use empty string to leverage Next.js rewrites (proxy to backend)
 // In production, use the explicit backend URL
 const isDev = process.env.NODE_ENV === 'development';
-const AUTH_ORIGIN = isDev ? '' : (
+const AUTH_ORIGIN = (
   process.env.NEXT_PUBLIC_AUTH_ORIGIN ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  'http://localhost:8001'
+  (isDev ? 'http://127.0.0.1:8000' : 'http://localhost:8000')
 ).replace(/\/$/, '');
 
 // Timeout wrapper for fetch to prevent hanging
@@ -130,12 +131,24 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 function getAccessTokenFromPayload(payload: AuthResponsePayload): string {
-  return payload.access_token || payload.token || '';
+  return payload.access_token || '';
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    // Hydrate immediately from cache to avoid blocking render
+    if (typeof window !== 'undefined') {
+      return getStoredUser<UserProfile>() ?? null;
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    // Only show loading if we have a token that needs validation
+    if (typeof window !== 'undefined') {
+      return !!getAuthToken() || !!getStoredUser<UserProfile>();
+    }
+    return false;
+  });
 
   const hydrateSession = useCallback(async (payload: AuthResponsePayload): Promise<UserProfile> => {
     const accessToken = getAccessTokenFromPayload(payload);
@@ -173,43 +186,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return profile;
   }, []);
 
-  // Validate session with auth authority on startup
+  // Validate session with auth authority on startup — NON-BLOCKING
+  // Strategy: show cached user immediately, validate silently in background
   useEffect(() => {
     const controller = new AbortController();
-    (async () => {
-      try {
-        // First, try to restore user from localStorage if available (faster)
-        const storedUser = getStoredUser<UserProfile>();
-        const token = getAuthToken();
-        if (storedUser && token) {
-          setUser(storedUser);
-        }
+    let isMounted = true;
 
-        // Then verify with backend
-        const meRes = await authFetch('/auth/me', { method: 'GET', signal: controller.signal, timeout: 3000 });
+    (async () => {
+      const token = getAuthToken();
+      if (!token) {
+        if (isMounted) setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Fast validation: 1.5s timeout (was 3s) — don't block UI
+        const meRes = await authFetch('/auth/me', { method: 'GET', signal: controller.signal, timeout: 1500 });
+
         if (meRes.ok) {
           const meJson = (await meRes.json()) as AuthResponsePayload;
-          if (!meJson.user) {
-            throw new Error('Profile validation returned an incomplete payload.');
-          }
-          const profile = toUserProfile(meJson.user);
-          setUser(profile);
-          if (token) {
+          if (meJson.user && isMounted) {
+            const profile = toUserProfile(meJson.user);
+            setUser(profile);
             setAuthCredentials(token, profile);
           }
+          if (isMounted) setIsLoading(false);
           return;
         }
 
-        // If /auth/me fails but we have stored user, keep the stored user (it's recent)
-        if (storedUser && token) {
-          console.warn('Backend /auth/me validation failed but restoring from cache');
-          return;
-        }
-
-        // Try token refresh
+        // Fast token refresh: 1.5s timeout
         const refreshToken = getStoredRefreshToken();
         if (!refreshToken) {
-          setUser(null);
+          if (isMounted) {
+            setUser(null);
+            clearAuthCredentials();
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -218,51 +230,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
           signal: controller.signal,
-          timeout: 3000,
+          timeout: 1500,
         });
 
         if (!refreshRes.ok) {
-          setUser(null);
+          if (isMounted) {
+            setUser(null);
+            clearAuthCredentials();
+            setIsLoading(false);
+          }
           return;
         }
 
         const refreshJson = (await refreshRes.json()) as AuthResponsePayload;
-        if (refreshJson.access_token) {
-          setAuthCredentials(refreshJson.access_token, storedUser);
+        if (refreshJson.access_token && isMounted) {
+          setAuthCredentials(refreshJson.access_token, getStoredUser<UserProfile>());
         }
         if (refreshJson.refresh_token) {
           setRefreshToken(refreshJson.refresh_token);
         }
 
-        const meAfterRefreshRes = await authFetch('/auth/me', { method: 'GET', signal: controller.signal, timeout: 3000 });
+        const meAfterRefreshRes = await authFetch('/auth/me', { method: 'GET', signal: controller.signal, timeout: 1500 });
         if (!meAfterRefreshRes.ok) {
-          setUser(null);
+          if (isMounted) {
+            setUser(null);
+            clearAuthCredentials();
+            setIsLoading(false);
+          }
           return;
         }
 
         const meAfterRefreshJson = (await meAfterRefreshRes.json()) as AuthResponsePayload;
-        if (!meAfterRefreshJson.user) {
-          throw new Error('Profile refresh returned an incomplete payload.');
-        }
-        const profile = toUserProfile(meAfterRefreshJson.user);
-        setUser(profile);
-        const refreshedAccessToken = refreshJson.access_token || token;
-        if (refreshedAccessToken) {
-          setAuthCredentials(refreshedAccessToken, profile);
+        if (meAfterRefreshJson.user && isMounted) {
+          const profile = toUserProfile(meAfterRefreshJson.user);
+          setUser(profile);
+          const refreshedAccessToken = refreshJson.access_token || token;
+          if (refreshedAccessToken) {
+            setAuthCredentials(refreshedAccessToken, profile);
+          }
         }
       } catch (error) {
-        // Backend unavailable or timeout - fail gracefully without blocking the app
-        console.warn('Auth initialization failed (backend may be unavailable):', error);
-        // Don't clear user if we have one cached
+        // Backend unavailable or timeout — keep cached user, fail gracefully
+        console.warn('Auth validation deferred (backend may be unavailable):', error);
+        // Don't clear user if we have one cached — improves perceived performance
         const storedUser = getStoredUser<UserProfile>();
-        if (!storedUser) {
+        if (!storedUser && isMounted) {
           setUser(null);
         }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     })();
-    return () => controller.abort();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -284,10 +307,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string): Promise<{ error?: string; user?: UserProfile }> => {
     try {
+      clearAuthCredentials();
       const response = await api.post<AuthResponsePayload>(API_ENDPOINTS.AUTH.LOGIN, {
         email,
         password,
-      });
+      }, { skipAuth: true });
       const profile = await hydrateSession(response);
 
       return { user: profile };
@@ -307,7 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         name: fullName,
-      });
+      }, { skipAuth: true });
 
       // Backend now returns tokens for auto-login
       if (response.access_token) {
@@ -350,12 +374,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const resetPassword = async (email: string): Promise<{ error?: string }> => {
+  const resetPassword = async (email: string): Promise<{ error?: string; resetLink?: string }> => {
     try {
-      await api.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
-      return {};
+      const response = await api.post<AuthResponsePayload>(
+        API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
+        { email },
+        { skipAuth: true }
+      );
+      return { resetLink: response.dev_reset_link };
     } catch (error) {
       return { error: getErrorMessage(error, 'Unable to request a password reset right now.') };
+    }
+  };
+
+  const confirmPasswordReset = async (
+    token: string,
+    newPassword: string
+  ): Promise<{ error?: string; user?: UserProfile }> => {
+    try {
+      clearAuthCredentials();
+      const response = await api.post<AuthResponsePayload>(API_ENDPOINTS.AUTH.RESET_PASSWORD, {
+        token,
+        new_password: newPassword,
+      }, { skipAuth: true });
+      const profile = await hydrateSession(response);
+      return { user: profile };
+    } catch (error) {
+      return { error: getErrorMessage(error, 'Unable to reset your password right now.') };
     }
   };
 
@@ -371,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         refreshUser,
         resetPassword,
+        confirmPasswordReset,
       }}
     >
       {children}

@@ -501,7 +501,7 @@ export function useAlertRules({ storeId, enabled = true }: UseAlertRulesOptions)
         return JSON.stringify(localConfig.do_not_disturb) !== JSON.stringify(response.data.do_not_disturb);
       case 'types':
         const types = ['high_value_order', 'unusual_returns', 'inventory_depletion', 'conversion_anomaly', 'customer_segment'] as const;
-        return types.some(t => JSON.stringify(localConfig[t]) !== JSON.stringify(response.data[t]));
+        return types.some(t => JSON.stringify(localConfig[t]) !== JSON.stringify(response.data?.[t]));
       default:
         return isDirty;
     }

@@ -40,7 +40,6 @@ export interface OAuthCallbackRequest {
 
 export interface AuthResponse {
   success: boolean;
-  token?: string;
   access_token?: string;
   refresh_token?: string;
   user?: User;
@@ -69,7 +68,7 @@ export const authService = {
     }
 
     const tokens: AuthTokens = {
-      access_token: response.access_token || response.token || '',
+      access_token: response.access_token || '',
       refresh_token: response.refresh_token || '',
       token_type: 'Bearer',
     };
@@ -89,7 +88,7 @@ export const authService = {
     }
 
     const tokens: AuthTokens = {
-      access_token: response.access_token || response.token || '',
+      access_token: response.access_token || '',
       refresh_token: response.refresh_token || '',
       token_type: 'Bearer',
     };
@@ -109,7 +108,7 @@ export const authService = {
     }
 
     const tokens: AuthTokens = {
-      access_token: response.access_token || response.token || '',
+      access_token: response.access_token || '',
       refresh_token: response.refresh_token || '',
       token_type: 'Bearer',
     };

@@ -26,7 +26,15 @@ from database.models import UserRole, AppRole
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
-_product_controller = ProductController()
+_product_controller: Optional[ProductController] = None
+
+
+def get_product_controller() -> ProductController:
+    """Load the in-memory catalog only when analytics actually needs it."""
+    global _product_controller
+    if _product_controller is None:
+        _product_controller = ProductController()
+    return _product_controller
 
 
 def _require_admin_or_manager(user: UserProfile, db: Session) -> None:
@@ -78,8 +86,9 @@ async def analytics_overview(
             product_counts[product_id] += item.get("quantity", 1)
 
     # Enrich with catalog data for categories and colors
+    product_controller = get_product_controller()
     for product_id, count in product_counts.items():
-        product = await _product_controller.get_product_by_id(product_id)
+        product = await product_controller.get_product_by_id(product_id)
         if not product:
             continue
         category = product.get("category")
@@ -90,7 +99,7 @@ async def analytics_overview(
 
     most_styled_items: List[Dict] = []
     for product_id, count in product_counts.most_common(5):
-        product = await _product_controller.get_product_by_id(product_id)
+        product = await product_controller.get_product_by_id(product_id)
         if not product:
             continue
         most_styled_items.append(

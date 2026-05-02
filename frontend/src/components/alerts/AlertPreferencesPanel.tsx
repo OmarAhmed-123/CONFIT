@@ -564,9 +564,9 @@ interface AlertPreferencesPanelProps {
 export function AlertPreferencesPanel({ storeId, onSave, className }: AlertPreferencesPanelProps) {
   const store = useSalesAlertStore((s) => ({
     preferences: s.getPreferences(storeId),
-    updateThresholds: (t) => s.updateThresholds(storeId, t),
-    updateFrequency: (f) => s.updateFrequency(storeId, f),
-    updateTypePreference: (type, pref) => s.updateTypePreference(storeId, type, pref),
+    updateThresholds: (t: Partial<AlertThresholdConfig>) => s.updateThresholds(storeId, t),
+    updateFrequency: (f: any) => s.updateFrequency(storeId, f),
+    updateTypePreference: (type: any, pref: any) => s.updateTypePreference(storeId, type, pref),
     resetPreferencesToDefaults: () => s.resetPreferencesToDefaults(storeId),
   }));
 

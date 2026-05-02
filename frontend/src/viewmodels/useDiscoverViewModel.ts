@@ -5,8 +5,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useGender } from '@/context/GenderContext';
-import { searchProducts, mockProducts } from '@/services/mockData';
+import { mockProducts } from '@/services/mockData';
 import { apiUrl } from '@/lib/api';
 import { unwrapApiData } from '@/lib/api/envelope';
 import { resolveImageUrl } from '@/lib/imageUrl';
@@ -55,8 +54,6 @@ function toProduct(p: Record<string, unknown>): Product {
 }
 
 export function useDiscoverViewModel() {
-    const { selectedGender } = useGender();
-
     // ── Product data ──────────────────────────────────────────────
     const [products, setProducts] = useState<Product[]>(() => mockProducts);
     const [isLoading, setIsLoading] = useState(false);
@@ -195,7 +192,6 @@ export function useDiscoverViewModel() {
         };
     }, [
         fetchPage,
-        selectedGender,
         selectedBrands,
         selectedColors,
         inStockOnly,
@@ -251,16 +247,6 @@ export function useDiscoverViewModel() {
                 return false;
             }
 
-            // Gender filter
-            if (selectedGender) {
-                const productGender = (product.gender || 'unisex').toLowerCase();
-                const selectedGenderLower = selectedGender.toLowerCase();
-                const genderMatch = productGender === selectedGenderLower || productGender === 'unisex';
-                if (!genderMatch) {
-                    return false;
-                }
-            }
-
             // Text search
             if (debouncedQuery) {
                 const q = debouncedQuery.toLowerCase();
@@ -294,7 +280,7 @@ export function useDiscoverViewModel() {
             return true;
         });
         return filtered;
-    }, [products, debouncedQuery, selectedCategories, priceRange, selectedBrands, selectedColors, inStockOnly, selectedGender]);
+    }, [products, debouncedQuery, selectedCategories, priceRange, selectedBrands, selectedColors, inStockOnly]);
 
     // ── Derived: sorted products ───────────────────────────────────
     const sortedProducts = useMemo(() => {
@@ -307,8 +293,7 @@ export function useDiscoverViewModel() {
                 case 'popularity': 
                     return (b.styleCompatibility || 0) - (a.styleCompatibility || 0);
                 case 'newest':
-                    // For demo purposes, give newer items higher scores
-                    return Math.random() - 0.5;
+                    return String(b.id).localeCompare(String(a.id));
                 default: 
                     return 0;
             }

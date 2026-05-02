@@ -6,6 +6,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 const AIAdminDashboard = dynamic(
   () => import('@/pages/AIAdminDashboard').then((m) => m.default),
@@ -20,5 +21,9 @@ const AIAdminDashboard = dynamic(
 );
 
 export default function AIAdminRoutePage() {
-  return <AIAdminDashboard />;
+  return (
+    <ProtectedRoute>
+      <AIAdminDashboard />
+    </ProtectedRoute>
+  );
 }

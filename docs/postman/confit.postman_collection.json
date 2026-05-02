@@ -1,0 +1,1216 @@
+{
+  "info": {
+    "_postman_id": "confit-api-collection-v1",
+    "name": "CONFIT API Collection",
+    "description": "Complete API collection for CONFIT Fashion Marketplace Platform.\n\nBase URL: https://api.confit.app\nEnvironment Variables:\n- {{base_url}} - API base URL\n- {{auth_token}} - JWT bearer token\n- {{api_version}} - API version (default: v1)\n\nAuthentication: All endpoints except /auth/* require Bearer token in Authorization header.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and registration endpoints",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"name\": \"John Doe\",\n  \"phone\": \"+201234567890\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/verify-otp",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "verify-otp"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Request Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/auth/password-reset",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "auth", "password-reset"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "description": "User profile and account management",
+      "item": [
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+201234567890\",\n  \"date_of_birth\": \"1990-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get User Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get User Style DNA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/style-dna",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "style-dna"]
+            }
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirm_deletion\": true,\n  \"keep_order_history\": true,\n  \"reason\": \"No longer needed\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Data Compliance (Law 151/2020)",
+      "description": "Egyptian Personal Data Protection Law compliance endpoints",
+      "item": [
+        {
+          "name": "Get Data Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Request Data Export",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"json\",\n  \"include_tryon_photos\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/export",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "export"]
+            }
+          }
+        },
+        {
+          "name": "Check Export Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/export/{{export_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "export", "{{export_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Rectify Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"field\": \"phone\",\n  \"new_value\": \"+201234567890\",\n  \"reason\": \"Updated phone number\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/rectify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "rectify"]
+            }
+          }
+        },
+        {
+          "name": "Get Retention Policies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/retention-policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "retention-policies"]
+            }
+          }
+        },
+        {
+          "name": "Get DPO Contact",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/me/data/dpo-contact",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "me", "data", "dpo-contact"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Virtual Try-On",
+      "description": "AI-powered virtual try-on service endpoints",
+      "item": [
+        {
+          "name": "Create Try-On Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"garment_image_url\": \"https://example.com/dress.jpg\",\n  \"user_photo_url\": \"https://example.com/user.jpg\",\n  \"garment_type\": \"dress\",\n  \"options\": {\n    \"pose\": \"standing\",\n    \"background\": \"studio\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/tryon",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "tryon"]
+            }
+          }
+        },
+        {
+          "name": "Get Try-On Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/tryon/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "tryon", "{{session_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Try-On History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/tryon/history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "tryon", "history"]
+            }
+          }
+        },
+        {
+          "name": "Upload User Photo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": "/path/to/photo.jpg"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/tryon/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "tryon", "upload"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Marketplace - Products",
+      "description": "Product catalog and search endpoints",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/products?page=1&limit=20&category=dresses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": "dresses"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "products", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Search Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/products/search?q=red+dress&filters=size:L,color:red",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "products", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "red dress"
+                },
+                {
+                  "key": "filters",
+                  "value": "size:L,color:red"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/products/{{product_id}}/recommendations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "products", "{{product_id}}", "recommendations"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Marketplace - Orders",
+      "description": "Order creation and management",
+      "item": [
+        {
+          "name": "Create Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"product_id\": \"prod_123\",\n      \"quantity\": 1,\n      \"size\": \"M\",\n      \"color\": \"red\"\n    }\n  ],\n  \"shipping_address\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"Cairo\",\n    \"governorate\": \"Cairo\",\n    \"postal_code\": \"12345\",\n    \"phone\": \"+201234567890\"\n  },\n  \"payment_method\": \"paymob\",\n  \"coupon_code\": \"WELCOME15\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed mind\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/orders/{{order_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "orders", "{{order_id}}", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Request Return",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_item_id\": \"item_123\",\n  \"reason\": \"Wrong size\",\n  \"photos\": [\"url1\", \"url2\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/orders/{{order_id}}/return",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "orders", "{{order_id}}", "return"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "description": "Payment processing and wallet management",
+      "item": [
+        {
+          "name": "Initialize Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"order_123\",\n  \"amount_piastres\": 250000,\n  \"payment_method\": \"paymob_card\",\n  \"billing_details\": {\n    \"name\": \"John Doe\",\n    \"email\": \"user@example.com\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/payments/initialize",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "payments", "initialize"]
+            }
+          }
+        },
+        {
+          "name": "Get Payment Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/payments/{{payment_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "payments", "{{payment_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/wallet/balance",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "wallet", "balance"]
+            }
+          }
+        },
+        {
+          "name": "Get Wallet Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/wallet/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "wallet", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Fawry Payment (Generate Reference)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"order_123\",\n  \"amount_piastres\": 250000,\n  \"payment_method\": \"fawry\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/payments/fawry/reference",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "payments", "fawry", "reference"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Donations",
+      "description": "Donation program endpoints",
+      "item": [
+        {
+          "name": "List Available Donations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/donations/available?size=M&category=shirts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "donations", "available"],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "M"
+                },
+                {
+                  "key": "category",
+                  "value": "shirts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Donation Listing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_type\": \"shirt\",\n  \"size\": \"M\",\n  \"brand\": \"Brand Name\",\n  \"condition\": \"excellent\",\n  \"photos\": [\"url1\", \"url2\"],\n  \"description\": \"Blue cotton shirt, barely worn\",\n  \"estimated_value_egp\": 200\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/donations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "donations"]
+            }
+          }
+        },
+        {
+          "name": "Get Donation History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/donations/history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "donations", "history"]
+            }
+          }
+        },
+        {
+          "name": "Get Donation Tax Receipt",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/donations/{{donation_id}}/receipt",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "donations", "{{donation_id}}", "receipt"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Style Stylist & AI",
+      "description": "AI stylist and style recommendations",
+      "item": [
+        {
+          "name": "Get Style Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/stylist/recommendations?occasion=casual&season=summer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "stylist", "recommendations"],
+              "query": [
+                {
+                  "key": "occasion",
+                  "value": "casual"
+                },
+                {
+                  "key": "season",
+                  "value": "summer"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Complete Outfit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"base_item_id\": \"prod_123\",\n  \"occasion\": \"work\",\n  \"budget_egp\": 2000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/stylist/outfit",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "stylist", "outfit"]
+            }
+          }
+        },
+        {
+          "name": "Chat with AI Stylist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What should I wear to a wedding in Cairo in June?\",\n  \"context\": {\n    \"previous_items\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/stylist/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "stylist", "chat"]
+            }
+          }
+        },
+        {
+          "name": "Analyze Style DNA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": {\n    \"colors\": [\"navy\", \"white\", \"beige\"],\n    \"styles\": [\"classic\", \"minimalist\"],\n    \"avoid\": [\"flashy\", \"oversized\"]\n  },\n  \"body_measurements\": {\n    \"height_cm\": 175,\n    \"size\": \"M\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/stylist/style-dna",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "stylist", "style-dna"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Panel",
+      "description": "Administrative endpoints (Admin role required)",
+      "item": [
+        {
+          "name": "Admin Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/dashboard/stats",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "dashboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"john@example.com\",\n  \"role\": \"customer\",\n  \"status\": \"active\",\n  \"limit\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/search",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "search"]
+            }
+          }
+        },
+        {
+          "name": "Suspend User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"user_123\",\n  \"action\": \"suspend\",\n  \"reason\": \"Violation of terms\",\n  \"duration_days\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/suspend",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "users", "suspend"]
+            }
+          }
+        },
+        {
+          "name": "Process Order Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"order_123\",\n  \"action\": \"refund\",\n  \"reason\": \"Defective item\",\n  \"amount_piastres\": 250000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/orders/action",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "orders", "action"]
+            }
+          }
+        },
+        {
+          "name": "Brand Onboarding Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brand_id\": \"brand_123\",\n  \"action\": \"approve\",\n  \"reason\": \"KYC verified\",\n  \"commission_rate\": 15.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/brands/onboarding",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "brands", "onboarding"]
+            }
+          }
+        },
+        {
+          "name": "Send Broadcast Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Summer Sale!\",\n  \"message\": \"Get 30% off on all summer dresses this weekend only!\",\n  \"target_audience\": \"customers\",\n  \"channel\": \"push\",\n  \"respect_preferences\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/notifications/broadcast",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "notifications", "broadcast"]
+            }
+          }
+        },
+        {
+          "name": "Disable Coupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coupon_id\": \"coupon_123\",\n  \"action\": \"disable\",\n  \"reason\": \"Abuse detected\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/coupons/action",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "coupons", "action"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health & System",
+      "description": "System health and status endpoints",
+      "item": [
+        {
+          "name": "API Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "health"]
+            }
+          }
+        },
+        {
+          "name": "System Health (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/system/health",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "system", "health"]
+            }
+          }
+        },
+        {
+          "name": "Get API Version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/version",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "version"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.confit.app",
+      "type": "string"
+    },
+    {
+      "key": "api_version",
+      "value": "v1",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "prod_example",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "order_example",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "session_example",
+      "type": "string"
+    },
+    {
+      "key": "payment_id",
+      "value": "pay_example",
+      "type": "string"
+    },
+    {
+      "key": "export_id",
+      "value": "export_example",
+      "type": "string"
+    },
+    {
+      "key": "donation_id",
+      "value": "don_example",
+      "type": "string"
+    }
+  ]
+}

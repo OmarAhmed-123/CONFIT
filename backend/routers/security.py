@@ -565,10 +565,18 @@ async def discover_targets(request: Request) -> DiscoveryResponse:
         targets = await discovery.get_scan_targets()
         return DiscoveryResponse(**targets)
     except Exception as exc:
-        logger.error("Target discovery failed: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Target discovery failed: {exc}",
+        logger.warning("Target discovery failed; returning empty discovery result: %s", exc)
+        return DiscoveryResponse(
+            api_routes=[],
+            web_routes=[],
+            services=[],
+            summary={
+                "total_routes": 0,
+                "total_web_routes": 0,
+                "total_services": 0,
+                "route_groups": {},
+                "methods": {},
+            },
         )
 
 

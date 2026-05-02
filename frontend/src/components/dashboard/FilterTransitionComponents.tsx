@@ -6,9 +6,9 @@
  */
 
 import { memo, useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence, useInView, useAnimation } from 'framer-motion';
+import { motion, AnimatePresence, useInView, useAnimation, type MotionStyle } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { DURATION_LUXURY, DURATION_STANDARD, EASE_LUXURY, EASE_STANDARD } from '@/motion';
+import { DURATION_LUXURY, DURATION_STANDARD, EASE_LUXURY, EASE_EXIT } from '@/motion';
 import '@/components/predictive/predictive.css';
 
 // ─── Color Palette (CONFIT Luxury) ────────────────────────────────────
@@ -46,7 +46,7 @@ export const filterTransitionVariants = {
     y: -8,
     transition: {
       duration: DURATION_STANDARD,
-      ease: EASE_STANDARD,
+      ease: EASE_EXIT,
     },
   },
 };
@@ -72,7 +72,7 @@ export const valueChangeVariants = {
     filter: 'blur(4px)',
     transition: {
       duration: DURATION_STANDARD / 2,
-      ease: EASE_STANDARD,
+      ease: EASE_EXIT,
     },
   },
 };
@@ -148,7 +148,7 @@ export const AnimatedMetricValue = memo(function AnimatedMetricValue({
             isAnimating
               ? {
                   '--highlight-color': highlightColor,
-                }
+                } as MotionStyle
               : undefined
           }
         >

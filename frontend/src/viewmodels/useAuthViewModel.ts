@@ -81,14 +81,21 @@ export function useAuthViewModel(initialMode: AuthMode = 'login') {
                 return;
             }
             setIsSubmitting(true);
-            const { error } = await resetPassword(form.email);
+            const { error, resetLink } = await resetPassword(form.email);
             setIsSubmitting(false);
             if (error) {
                 toast.error('Reset Failed', { description: error });
             } else {
                 toast.success('Reset Email Sent', {
-                    description: 'Check your inbox for password reset instructions.',
+                    description: resetLink
+                        ? 'Development mode: opening the secure reset link now.'
+                        : 'Check your inbox for password reset instructions.',
                 });
+                if (resetLink) {
+                    const url = new URL(resetLink, window.location.origin);
+                    router.push(`${url.pathname}${url.search}`);
+                    return;
+                }
                 setMode('login');
             }
             return;

@@ -6,16 +6,41 @@ import { MainLayout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { styleTypes, brands, occasions } from '@/services/mockData';
-import { mockOrders, getStatusColor } from '@/services/orderData';
+import { getStatusColor } from '@/services/orderData';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import type { StyleType } from '@/types';
 import { NotificationPreferences } from '@/components/notifications/NotificationPreferences';
+import { api } from '@/lib/api/client';
+import { API_ENDPOINTS } from '@/lib/api/endpoints';
+import { safeImageSrc } from '@/lib/imageFallback';
+
+interface ProfileOrderPreview {
+  id: string;
+  orderNumber: string;
+  date: Date;
+  status: 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  total: number;
+  items: Array<{ name: string; image: string }>;
+}
+
+// Tailwind color mapping for palette display
+const COLOR_CLASS_MAP: Record<string, string> = {
+  White: 'bg-white',
+  Black: 'bg-black',
+  Navy: 'bg-[#1e3a5f]',
+  Beige: 'bg-[#d4b896]',
+  Grey: 'bg-[#6b7280]',
+  Brown: 'bg-[#78350f]',
+  Burgundy: 'bg-[#7c2d12]',
+};
 
 export default function ProfilePage() {
   const { user, updateProfile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'usp' | 'preferences' | 'body' | 'orders' | 'privacy' | 'notifications'>('profile');
   const [selectedStyles, setSelectedStyles] = useState<StyleType[]>(user?.stylePreferences?.styles as StyleType[] || ['minimalist', 'elegant']);
+  const [orders, setOrders] = useState<ProfileOrderPreview[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Local state for profile form
@@ -57,6 +82,44 @@ export default function ProfilePage() {
       }
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'orders') return;
+    let cancelled = false;
+    setOrdersLoading(true);
+    api.get<{ orders?: any[] }>(API_ENDPOINTS.ORDERS.LIST)
+      .then((payload) => {
+        if (cancelled) return;
+        const list = Array.isArray(payload.orders) ? payload.orders : [];
+        setOrders(list.map((order) => {
+          const rawItems = Array.isArray(order.items) ? order.items : [];
+          const status = String(order.status || 'processing').toLowerCase();
+          return {
+            id: String(order.id || order.order_id || order.order_number || ''),
+            orderNumber: String(order.orderNumber || order.order_number || order.id || 'CONF'),
+            date: new Date(order.placedAt || order.placed_at || order.created_at || Date.now()),
+            status: ['processing', 'shipped', 'delivered', 'cancelled'].includes(status)
+              ? status as ProfileOrderPreview['status']
+              : 'processing',
+            total: Number(order.total || 0),
+            items: rawItems.map((item: any) => ({
+              name: String(item.productName || item.product_name || item.name || 'Product'),
+              image: safeImageSrc(item.productImage || item.product_image || item.image || item.image_url || ''),
+            })),
+          };
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setOrders([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOrdersLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
   const toggleStyle = (style: StyleType) => {
     if (selectedStyles.includes(style)) {
@@ -226,11 +289,13 @@ export default function ProfilePage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  aria-label="Upload profile picture"
                   onChange={handleAvatarSelected}
                   className="hidden"
                 />
                 <button
                   type="button"
+                  aria-label="Change profile picture"
                   onClick={handlePickAvatar}
                   className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center"
                 >
@@ -531,12 +596,7 @@ export default function ProfilePage() {
                         <span className="capitalize">{style}</span>
                         <span className="font-medium">{score}%</span>
                       </div>
-                      <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-violet-500 to-blue-500 rounded-full transition-all"
-                          style={{ width: `${score}%` }}
-                        />
-                      </div>
+                      <StyleBar score={score} />
                     </div>
                   ))}
                   {Object.keys(usp.styleDNA).length === 0 && (
@@ -557,17 +617,7 @@ export default function ProfilePage() {
                   {usp.colorPalette.map((color) => (
                     <div key={color} className="text-center">
                       <div 
-                        className="w-12 h-12 rounded-lg border border-border mb-2"
-                        style={{ 
-                          backgroundColor: color.toLowerCase() === 'white' ? '#ffffff' :
-                            color.toLowerCase() === 'black' ? '#000000' :
-                            color.toLowerCase() === 'navy' ? '#1e3a5f' :
-                            color.toLowerCase() === 'beige' ? '#d4b896' :
-                            color.toLowerCase() === 'grey' ? '#6b7280' :
-                            color.toLowerCase() === 'brown' ? '#78350f' :
-                            color.toLowerCase() === 'burgundy' ? '#7c2d12' :
-                            '#6b7280'
-                        }}
+                        className={`w-12 h-12 rounded-lg border border-border mb-2 ${COLOR_CLASS_MAP[color] || 'bg-[#6b7280]'}`}
                       />
                       <span className="text-xs text-muted-foreground">{color}</span>
                     </div>
@@ -635,8 +685,10 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Body Shape</label>
+                    <label htmlFor="body-shape" className="text-sm font-medium mb-2 block">Body Shape</label>
                     <select
+                      id="body-shape"
+                      title="Body Shape"
                       className="w-full h-10 px-3 rounded-md border border-input bg-background"
                       value={bodyAttributes.bodyShape}
                       onChange={(e) => setBodyAttributes({ ...bodyAttributes, bodyShape: e.target.value })}
@@ -649,8 +701,10 @@ export default function ProfilePage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Fit Preference</label>
+                    <label htmlFor="fit-preference" className="text-sm font-medium mb-2 block">Fit Preference</label>
                     <select
+                      id="fit-preference"
+                      title="Fit Preference"
                       className="w-full h-10 px-3 rounded-md border border-input bg-background"
                       value={bodyAttributes.fitPreference}
                       onChange={(e) => setBodyAttributes({ ...bodyAttributes, fitPreference: e.target.value })}
@@ -705,10 +759,12 @@ export default function ProfilePage() {
                       <p className="text-sm text-muted-foreground">Allow AI to use your style data for recommendations</p>
                     </div>
                     <input
+                      id="ai-personalization"
                       type="checkbox"
                       checked={privacySettings.dataUsage}
                       onChange={(e) => setPrivacySettings({ ...privacySettings, dataUsage: e.target.checked })}
                       className="w-5 h-5 accent-accent"
+                      aria-label="Allow AI personalization"
                     />
                   </div>
                   <div className="flex items-center justify-between p-4 border border-border rounded-lg">
@@ -717,10 +773,12 @@ export default function ProfilePage() {
                       <p className="text-sm text-muted-foreground">Receive updates about new features and trends</p>
                     </div>
                     <input
+                      id="marketing-communications"
                       type="checkbox"
                       checked={privacySettings.marketing}
                       onChange={(e) => setPrivacySettings({ ...privacySettings, marketing: e.target.checked })}
                       className="w-5 h-5 accent-accent"
+                      aria-label="Allow marketing communications"
                     />
                   </div>
                   <div className="flex items-center justify-between p-4 border border-border rounded-lg">
@@ -729,14 +787,16 @@ export default function ProfilePage() {
                       <p className="text-sm text-muted-foreground">Allow others to see your saved outfits</p>
                     </div>
                     <input
+                      id="public-profile"
                       type="checkbox"
                       checked={privacySettings.publicProfile}
                       onChange={(e) => setPrivacySettings({ ...privacySettings, publicProfile: e.target.checked })}
                       className="w-5 h-5 accent-accent"
+                      aria-label="Make profile public"
                     />
                   </div>
                 </div>
-                <div className="mt-6">
+                <div className="mt-6 flex flex-wrap gap-3">
                   <Button
                     variant="outline"
                     onClick={async () => {
@@ -750,6 +810,12 @@ export default function ProfilePage() {
                   >
                     Update Privacy Settings
                   </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/profile/data">
+                      <Shield className="h-4 w-4 mr-2" />
+                      My Data & Privacy
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </motion.div>
@@ -761,9 +827,13 @@ export default function ProfilePage() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
             >
-              {mockOrders.length > 0 ? (
+              {ordersLoading ? (
+                <div className="bg-card rounded-xl border border-border p-6 text-center text-muted-foreground">
+                  Loading your orders...
+                </div>
+              ) : orders.length > 0 ? (
                 <>
-                  {mockOrders.slice(0, 3).map((order) => (
+                  {orders.slice(0, 3).map((order) => (
                     <div key={order.id} className="bg-card rounded-xl border border-border p-4 md:p-6">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                         <div>
@@ -786,8 +856,8 @@ export default function ProfilePage() {
                         {order.items.slice(0, 3).map((item, i) => (
                           <img
                             key={i}
-                            src={item.product.images[0]}
-                            alt={item.product.name}
+                            src={safeImageSrc(item.image)}
+                            alt={item.name}
                             className="w-14 h-18 object-cover rounded-lg"
                           />
                         ))}
@@ -824,7 +894,7 @@ export default function ProfilePage() {
           )}
 
           {activeTab === 'notifications' && (
-            <NotificationPreferences />
+            <NotificationPreferences recipientId={user?.id || 'guest'} recipientType="customer" />
           )}
         </div>
       </div>
@@ -854,5 +924,25 @@ function TabButton({
       {icon}
       <span className="text-sm font-medium">{label}</span>
     </button>
+  );
+}
+
+/**
+ * StyleBar sub-component - avoids inline styles for dynamic width
+ */
+function StyleBar({ score }: { score: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.style.width = `${score}%`;
+    }
+  }, [score]);
+  return (
+    <div className="h-2 bg-muted rounded-full overflow-hidden">
+      <div
+        ref={ref}
+        className="h-full bg-gradient-to-r from-violet-500 to-blue-500 rounded-full transition-all"
+      />
+    </div>
   );
 }

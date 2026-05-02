@@ -4,7 +4,7 @@ import {
     LayoutDashboard, Package, BarChart3, Megaphone, Settings, Plus, Search, Filter, Upload, MoreHorizontal,
     TrendingUp, DollarSign, Users, ShoppingBag, AlertCircle, CheckCircle2, X, RotateCcw, User, Bell, CreditCard,
     Globe, Mail, Building2, Truck, RefreshCw, Download, Eye, Edit, Trash2, UserPlus, Shield, Clock, MapPin,
-    Calendar, ChevronDown, ChevronRight, ExternalLink, Copy, FileText, ArrowUpRight, ArrowDownRight,
+    Calendar, ChevronDown, ChevronRight, ExternalLink, Copy, FileText, ArrowUpRight, ArrowDownRight, Target,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -30,6 +30,23 @@ import { createTransition } from '@/motion';
 import { OwnerNotificationsPanel } from '@/components/notifications/OwnerNotificationsPanel';
 import { SOSTACPanel } from '@/components/analytics/SOSTACPanel';
 import { SoldProductsTable } from '@/components/dashboard/SoldProductsTable';
+
+async function readJsonOrThrow(response: Response): Promise<any> {
+    const contentType = response.headers.get('content-type') || '';
+    const text = await response.text();
+    if (!response.ok) {
+        throw new Error(text || `Request failed with ${response.status}`);
+    }
+    if (!text) return {};
+    if (!contentType.includes('application/json')) {
+        throw new Error('Server returned a non-JSON response.');
+    }
+    return JSON.parse(text);
+}
+
+function getAuthHeaders(token: string | null): HeadersInit {
+    return token ? { Authorization: `Bearer ${token}`, Accept: 'application/json' } : { Accept: 'application/json' };
+}
 
 // Mock Products Data
 const MOCK_PRODUCTS = [
@@ -127,19 +144,19 @@ function OverviewTab() {
 
             try {
                 let brandId = DEFAULT_BRAND_ID;
-                const brandsRes = await fetch(apiUrl('/api/brands/'), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                const brandsRes = await fetch(apiUrl('/api/brands/'), { headers: getAuthHeaders(token) });
                 if (brandsRes.ok) {
-                    const brands = await brandsRes.json();
+                    const brands = await readJsonOrThrow(brandsRes);
                     if (Array.isArray(brands) && brands.length > 0 && brands[0].id) {
                         brandId = brands[0].id;
                     }
                 }
                 const res = await fetch(apiUrl(`/api/brands/${brandId}/analytics`), {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    headers: getAuthHeaders(token),
                 });
                 if (cancelled) return;
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await readJsonOrThrow(res);
                     setAnalytics(data);
                 } else {
                     setError('Failed to load analytics');
@@ -643,11 +660,9 @@ function AnalyticsTab() {
                 // Try to fetch real data from backend
                 let brandId = DEFAULT_BRAND_ID;
                 try {
-                    const brandsRes = await fetch(apiUrl('/api/brands/'), { 
-                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                    });
+                    const brandsRes = await fetch(apiUrl('/api/brands/'), { headers: getAuthHeaders(token) });
                     if (brandsRes.ok) {
-                        const brands = await brandsRes.json();
+                        const brands = await readJsonOrThrow(brandsRes);
                         if (Array.isArray(brands) && brands.length > 0 && brands[0].id) {
                             brandId = brands[0].id;
                         }
@@ -658,12 +673,10 @@ function AnalyticsTab() {
 
                 // Fetch Analytics
                 try {
-                    const resAn = await fetch(apiUrl(`/api/brands/${brandId}/analytics`), { 
-                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                    });
+                    const resAn = await fetch(apiUrl(`/api/brands/${brandId}/analytics`), { headers: getAuthHeaders(token) });
                     if (resAn.ok) {
-                        const data = await resAn.json();
-                        setAnalytics(prev => ({ ...prev, ...data }));
+                        const data = await readJsonOrThrow(resAn);
+                        setAnalytics((prev: any) => ({ ...prev, ...data }));
                     }
                 } catch (e) {
                     console.log('Using mock analytics data');
@@ -671,11 +684,9 @@ function AnalyticsTab() {
 
                 // Fetch AI Advice
                 try {
-                    const resAdv = await fetch(apiUrl(`/api/brands/${brandId}/advice`), { 
-                        headers: token ? { Authorization: `Bearer ${token}` } : {} 
-                    });
+                    const resAdv = await fetch(apiUrl(`/api/brands/${brandId}/advice`), { headers: getAuthHeaders(token) });
                     if (resAdv.ok) {
-                        const data = await resAdv.json();
+                        const data = await readJsonOrThrow(resAdv);
                         if (Array.isArray(data) && data.length > 0) {
                             setAdvice(data);
                         }
@@ -1046,7 +1057,7 @@ export default function BrandDashboard() {
                             <TabsContent value="overview" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Dashboard Overview</h1><Button>Export Report</Button></div><OverviewTab /></TabsContent>
                             <TabsContent value="products" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Inventory Management</h1></div><ProductsTab /></TabsContent>
                             <TabsContent value="orders" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Order Management</h1></div><OrdersTab /></TabsContent>
-                            <TabsContent value="sold" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Sold Products</h1></div><SoldProductsTable /></TabsContent>
+                            <TabsContent value="sold" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Sold Products</h1></div><SoldProductsTable data={[]} /></TabsContent>
                             <TabsContent value="analytics" className="mt-0"><AnalyticsTab /></TabsContent>
                             <TabsContent value="sostac" className="mt-0"><div className="flex items-center justify-between mb-6"><h1 className="text-3xl font-display font-semibold">Marketing Plan (SOSTAC)</h1></div><SOSTACPanel /></TabsContent>
                             <TabsContent value="campaigns" className="mt-0"><CampaignsTab /></TabsContent>

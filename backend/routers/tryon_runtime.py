@@ -30,6 +30,13 @@ async def get_tryon_capabilities() -> Dict[str, Any]:
     return {"success": True, **manager.get_capabilities()}
 
 
+@router.post("")
+@router.post("/")
+async def tryon_preview_legacy(payload: TryOnRuntimeRequest) -> Dict[str, Any]:
+    """Compatibility endpoint for older frontend hooks that post to /api/tryon."""
+    return await tryon_live_preview(payload)
+
+
 @router.post("/preview/live")
 async def tryon_live_preview(payload: TryOnRuntimeRequest) -> Dict[str, Any]:
     request_id = str(uuid.uuid4())
@@ -149,6 +156,12 @@ async def get_tryon_job(job_id: str) -> Dict[str, Any]:
 
 @router.get("/jobs/{job_id}")
 async def get_tryon_job_legacy(job_id: str) -> Dict[str, Any]:
+    return await get_tryon_job(job_id)
+
+
+@router.get("/status/{job_id}")
+async def get_tryon_status(job_id: str) -> Dict[str, Any]:
+    """Alias for /render/{job_id} — frontend polls this path."""
     return await get_tryon_job(job_id)
 
 

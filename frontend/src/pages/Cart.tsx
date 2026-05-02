@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 import { createTransition } from '@/motion';
+import { safeImageSrc } from '@/lib/imageFallback';
 
 export default function Cart() {
     const router = useRouter();
@@ -121,7 +122,7 @@ export default function Cart() {
                                     className="shrink-0 w-24 h-28 md:w-28 md:h-36 rounded-lg overflow-hidden bg-muted"
                                 >
                                     <img
-                                        src={item.product.images[0]}
+                                        src={safeImageSrc(item.product.images?.[0])}
                                         alt={item.product.name}
                                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                                     />
